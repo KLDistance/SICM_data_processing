@@ -1,5 +1,5 @@
 #ifndef __PARALLEL_PROCESSING_H__
-#define __PARALLEL_PROCESSING_C__
+#define __PARALLEL_PROCESSING_H__
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -8,9 +8,25 @@
 #include <CL/cl.h>
 #include <time.h>
 
+// Define the property array entry pass into the GPU
+#define L_PROPERTY_NUM 5
+
+// Relative number of rows related
+#define PL_RELATIVE_ROW 0
+// Relative number of columns related
+#define PL_RELATIVE_COL 1
+// Reciprocal of the drag coefficient
+#define PL_CENTRAL_DRAG 2
+// Distance coefficient for weight laplacian distance
+#define WL_DISTANCE_COEFFICIENT 3
+// Threshold
+#define SL_THRESHOLD 4
+
+
 typedef struct
 {
     char *kernel_source_str;
+    size_t kernel_source_size;
     cl_int cl_ret;
     cl_context context;
     cl_command_queue command_queue;
