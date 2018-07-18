@@ -158,7 +158,7 @@ int from_file_short(char *file_str, CSV_STRUCT *csv_struct_ptr)
     return 0;
 }
 
-int csv_reader(CSV_STRUCT *csv_struct_ptr)
+extern int csv_reader(CSV_STRUCT *csv_struct_ptr)
 {
     FILE *pFile = NULL;
     unsigned int file_size = 0;
@@ -202,5 +202,97 @@ int csv_reader(CSV_STRUCT *csv_struct_ptr)
             printf("Unresolved data type.\n");
             return -1;
     }
+    return 0;
+}
+
+static int csv_conv_thread_init(THREAD_PARAMETER *lpParameter, unsigned int thread_id, unsigned int *common_arr, char *txt_area)
+{
+    lpParameter->common_arr = common_arr;
+    lpParameter->def_thread_id = thread_id;
+    lpParameter->txt_area = txt_area;
+    return 0;
+}
+
+void* single_file_slice_proc(void *arg)
+{
+
+}
+
+extern int csv_writer(CSV_STRUCT *csv_struct_ptr)
+{
+    // File name process in case of name duplicates
+    char new_file_name[CSV_PATH_LEN] = {0};
+    sprintf(new_file_name, "proc_%s", csv_struct_ptr->csv_path);
+
+    // Open empty file
+    FILE *fp_new_csv = fopen(new_file_name, "w");
+    if(!fp_new_csv)
+    {
+        fprintf(stderr, "Unable to create a new empty csv file for data array!\n");
+        exit(1);
+    }
+
+    if(csv_struct_ptr->row_num >= 4)
+    {
+        // Variables
+        unsigned int i;
+        char *txt_area_sets[4] = {(char*)0};
+        unsigned int gap_index[5] = {0};
+        unsigned int data_arr_num = csv_struct_ptr->row_num * csv_struct_ptr->col_num;
+        unsigned int single_space = 8 * data_arr_num;
+        pthread_t csv_conv_thread_arr[4];
+        CSV_OPS_MULTITHREAD_PARAMETER thread_parameter_arr[4];
+        
+        // Set terminal array position
+        gap_index[4] = data_arr_num;
+
+        for(i = 0; i < 4; i++)
+        {
+            // Allocate space for the 4 threads processing char arrays
+            txt_area_sets[i] = (char*)malloc(single_space);
+            
+            // Calculate the gap indexes for the 4 threads in the data array
+            gap_index[i] = (unsigned int)(csv_struct_ptr->row_num / 4) * i * csv_struct_ptr->col_num;
+        }
+
+        // Initiate the thread parameter
+        for(i = 0; i < 4; i++)
+        {
+            csv_conv_thread_init(&thread_parameter_arr[i], i, gap_index, txt_area_sets[i]);
+        }
+
+        // Execute the threads
+        for(i = 0; i < 4; i++)
+        {
+            pthread_create(&csv_conv_thread_arr[i], NULL, single_file_slice_proc, (void*)&(thread_parameter_arr[i]));
+        }
+
+        usleep(100000);
+
+        // Wait for the joints of the subthreads
+        for(i = 0; i < 4; i++)
+        {
+            pthread_join(csv_conv_thread_arr[i], NULL);
+        }
+
+        // Write contents into file
+        for(i = 0; i < 4; i++)
+        {
+            fseek(fp_new_csv, gap_index[i], SEEK_SET);
+            fwrite(txt_area_sets[i], gap_index[i + 1] - gap_index[i], 1, fp_new_csv);
+        }
+        fseek(fp_new_csv, 0, SEEK_SET);
+
+        // Release the space
+        for(i = 0; i < 4; i++)
+        {
+            free(txt_area_sets[i]);
+        }
+    }
+    else
+    {
+
+    }
+
     return 0;
 }

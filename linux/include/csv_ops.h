@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <pthread.h>
 
 // .csv file path length
 #define CSV_PATH_LEN 256
@@ -16,6 +18,14 @@
 #define CSV_TYPE_INT 1
 #define CSV_TYPE_SHORT 2
 
+// Thread identifier
+typedef struct
+{
+    unsigned int *common_arr;
+    unsigned int def_thread_id;
+    char *txt_area;
+} CSV_OPS_MULTITHREAD_PARAMETER;
+
 // Define .csv file struct
 typedef struct
 {
@@ -23,6 +33,7 @@ typedef struct
     unsigned int row_num;
     unsigned int col_num;
     void *data_arr;
+    float *result_data_arr;
     char csv_data_type;
 } CSV_STRUCT;
 
@@ -34,5 +45,7 @@ int from_file_short(char *file_str, CSV_STRUCT *csv_struct_ptr);
 
 extern int csv_reader(CSV_STRUCT *csv_struct_ptr);
 extern int csv_writer(CSV_STRUCT *csv_struct_ptr);
+
+void* single_file_slice_proc(void *arg);
 
 #endif
