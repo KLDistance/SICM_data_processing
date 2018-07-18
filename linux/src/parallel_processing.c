@@ -52,7 +52,22 @@ extern int init_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr, unsigned int ro
 {
     // Copy in the data into the gpu_data_2d_arr
     if(!data_arr) return -1;
-    gpu_data_2d_arr_ptr->input_data_arr = data_arr;
+    gpu_data_2d_arr_ptr->input_data_arr = (float*)malloc(row_num * col_num * sizeof(float));
+    if(!gpu_data_2d_arr_ptr->input_data_arr)
+    {
+        fprintf(stderr, "Unable to assign the space for the GPU_DATA_2D_ARR!\n");
+        exit(1);
+    }
+    unsigned int i;
+    unsigned int j;
+    for(i = 0; i < row_num; i++)
+    {
+        unsigned int tmp_iter = i * col_num;
+        for(j = 0; j < col_num; j++)
+        {
+            gpu_data_2d_arr_ptr[tmp_iter + j] = data_arr[tmp_iter + j];
+        }
+    }
     gpu_data_2d_arr_ptr->row_num = row_num;
     gpu_data_2d_arr_ptr->col_num = col_num;
 
@@ -65,6 +80,9 @@ extern int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_
 {
     // Set basic options to the parallel computation through array
     int[L_PROPERTY_NUM] para_arr = {0};
+    para_arr[PL_RELATIVE_ROW] = 11;
+    para_arr[PL_RELATIVE_COL] = 11;
+    para_arr[PL_CENTRAL_DRAG] = 1;
     
     // Calculate the data size and data number
     gpu_data_2d_arr_ptr->data_num = gpu_data_2d_arr_ptr->row_num * gpu_data_2d_arr_ptr->col_num;
@@ -82,6 +100,63 @@ extern int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_
     // Create program
     cl_program program = clCreateProgramWithSource(gpu_com_struct_ptr->context, 1, (const char**)&(gpu_com_struct_ptr->kernel_source_str), (const size_t*)&(gpu_com_struct_ptr->kernel_source_size), &(gpu_com_struct_ptr->cl_ret));
     // Construct program
+    gpu_com_struct_ptr->cl_ret = clBuildProgram(program, 1, &(gpu_com_struct_ptr->device_id), NULL, NULL, NULL);
+    // Create OpenCL kernel
+    cl_kernel kernel = clCreateKernel(program, "primitive_laplacian", &(gpu_com_struct_ptr->cl_ret));
+
+    // Set kernel parameters
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&(gpu_data_2d_arr_ptr->input_data_arr));
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void*)&(gpu_data_2d_arr_ptr->output_data_arr));
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void*)&(gpu_data_2d_arr_ptr->para_arr));
+
+    // Execute the kernel
+    size_t global_item_size = gpu_data_2d_arr_ptr->data_num;
+    size_t local_item_size = 64;
+    gpu_com_struct_ptr->cl_ret = clEnqueueNDRangeKernel(gpu_com_struct_ptr->command_queue, kernel, 1, NULL, &global_item_size, &local_item_size, 0, NULL, NULL);
+
+    // Read RAM buffer output_arr_mem input the local buffer output_data_arr
+    gpu_com_struct_ptr->cl_ret = clEnqueueReadBuffer(gpu_com_struct_ptr->command_queue, output_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->output_data_arr, 0, NULL, NULL);
+
+    // Close and flush the CL local structures
+    gpu_com_struct_ptr->cl_ret = clFlush(gpu_com_struct_ptr->command_queue);
+    gpu_com_struct_ptr->cl_ret = clFinish(gpu_com_struct_ptr->command_queue);
+    gpu_com_struct_ptr->cl_ret = clReleaseKernel(kernel);
+    gpu_com_struct_ptr->cl_ret = clReleaseProgram(program);
+    gpu_com_struct_ptr->cl_ret = clReleaseMemObject(input_arr_mem);
+    gpu_com_struct_ptr->cl_ret = clReleaseMemObject(output_arr_mem);
+    gpu_com_struct_ptr->cl_ret = clReleaseMemObject(para_arr_mem);
+
+    return 0;
+}
+
+extern int destroy_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr)
+{
+    // Destroy the global CL objects
+    gpu_com_struct_ptr->cl_ret = clReleaseCommandQueue(gpu_com_struct_ptr->command_queue);
+    gpu_com_struct_ptr->cl_ret = clReleaseContext(gpu_com_struct_ptr->context);
+
+    return 0;
+}
+
+extern int destroy_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
+{
+    // Clear the dynamic-allocated memory
+    if(gpu_data_2d_arr_ptr->input_data_arr)
+    {
+        free(gpu_data_2d_arr_ptr->input_data_arr);
+        gpu_data_2d_arr_ptr->input_data_arr = NULL;
+    }
+    if(gpu_data_2d_arr_ptr->output_data_arr)
+    {
+        free(gpu_data-2d_arr_ptr->output_data_arr);
+        gpu_data_2d_arr_ptr->output_data_arr = NULL;
+    }
+
+    // Zero-set the matrix indicators
+    gpu_data_2d_arr_ptr->row_num = 0;
+    gpu_data_2d_arr_ptr->col_num = 0;
+    gpu_data_2d_arr_ptr->data_size = 0;
+    gpu_data_2d_arr_ptr->data_num = 0;
 
     return 0;
 }
