@@ -25,21 +25,21 @@
 
 typedef struct
 {
-    char *kernel_source_str;
-    size_t kernel_source_size;
-    cl_int cl_ret;
-    cl_context context;
-    cl_command_queue command_queue;
+    char *kernel_source_str,
+    size_t kernel_source_size,
+    cl_int cl_ret,
+    cl_context context,
+    cl_command_queue command_queue
 } GPU_COM_STRUCT;
 
 typedef struct
 {
-    unsigned int row_num;
-    unsigned int col_num;
-    unsigned int data_num;
-    unsigned int data_size;
-    float *input_data_arr;
-    float *output_data_arr;
+    unsigned int row_num,
+    unsigned int col_num,
+    unsigned int data_num,
+    unsigned int data_size,
+    float *input_data_arr,
+    float *output_data_arr
 } GPU_DATA_2D_ARR;
 
 extern int init_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr);

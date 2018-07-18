@@ -205,17 +205,47 @@ extern int csv_reader(CSV_STRUCT *csv_struct_ptr)
     return 0;
 }
 
-static int csv_conv_thread_init(THREAD_PARAMETER *lpParameter, unsigned int thread_id, unsigned int *common_arr, char *txt_area)
+static int csv_conv_thread_init(THREAD_PARAMETER *lpParameter, unsigned int thread_id, unsigned int *common_arr, char *txt_area, unsigned int *strlen_indicator, CSV_STRUCT *csv_struct)
 {
     lpParameter->common_arr = common_arr;
     lpParameter->def_thread_id = thread_id;
     lpParameter->txt_area = txt_area;
+    lpParameter->string_length_indicator = strlen_indicator;
+    lpParameter->arr_row_num = csv_struct->row_num;
+    lpParameter->arr_col_num = csv_struct->col_num;
+    lpParameter->data_arr = csv_struct->result_data_arr;
     return 0;
 }
 
 void* single_file_slice_proc(void *arg)
 {
-
+    CSV_OPS_MULTITHREAD_PARAMETER *thread_parameter_ptr = (CSV_OPS_MULTITHREAD_PARAMETER*)arg;
+    char *tmp_ptr = thread_parameter_ptr->txt_area;
+    unsigned int i, j;
+    unsigned int tmp_product = 0;
+    unsigned int iter_length_indicator = 0;
+    for(i = thread_parameter_ptr->commen_arr[thread_parameter_ptr->thread_id]; i < thread_parameter_ptr->common_arr[thread_parameter_ptr->thread_id + 1]; i++)
+    {
+        tmp_product = i * thread_parameter_ptr->arr_col_num;
+        for(j = 0; j < thread_parameter_ptr->arr_col_num; j++)
+        {
+            if(j < thread_parameter_ptr->arr_col_num - 1)
+            {
+                sprintf(tmp_ptr, "%.8f,", thread_parameter_ptr->data_arr[tmp_product + j]);
+                iter_length_indicator = strlen(tmp_ptr);
+                thread_parameter_ptr->string_length_indicator[thread_parameter_ptr->thread_id] += iter_length_indicator;
+                tmp_ptr += (char*)iter_length_indicator;
+            }
+            else
+            {
+                sprintf(tmp_ptr, "%.8f\n", thread_parameter_ptr->data_arr[tmp_product + j]);
+                iter_length_indicator = strlen(tmp_ptr);
+                thread_parameter_ptr->string_length_indicator[thread_parameter_ptr->thread_id] += iter_length_indicator;
+                tmp_ptr += (char*)iter_length_indicator;
+            }
+        }
+    }
+    return (void*)0;
 }
 
 extern int csv_writer(CSV_STRUCT *csv_struct_ptr)
@@ -237,9 +267,12 @@ extern int csv_writer(CSV_STRUCT *csv_struct_ptr)
         // Variables
         unsigned int i;
         char *txt_area_sets[4] = {(char*)0};
+
+        // Gap index is specific to the row index, col index not included!
         unsigned int gap_index[5] = {0};
         unsigned int data_arr_num = csv_struct_ptr->row_num * csv_struct_ptr->col_num;
         unsigned int single_space = 8 * data_arr_num;
+        unsigned int string_length_indicator[4] = {0};
         pthread_t csv_conv_thread_arr[4];
         CSV_OPS_MULTITHREAD_PARAMETER thread_parameter_arr[4];
         
@@ -248,17 +281,27 @@ extern int csv_writer(CSV_STRUCT *csv_struct_ptr)
 
         for(i = 0; i < 4; i++)
         {
-            // Allocate space for the 4 threads processing char arrays
-            txt_area_sets[i] = (char*)malloc(single_space);
+            if(i == 3)
+            {
+                // Last set may contain more chars that the former 3 ones.
+                txt_area_sets[i] = (char*)malloc(single_space * 2);
+                memset(txt_area_sets[i], 0, single_space * 2);
+            }
+            else
+            {
+                // Allocate space for the 4 threads processing char arrays
+                txt_area_sets[i] = (char*)malloc(single_space);
+                memset(txt_area_sets[i], 0, single_space);
+            }
             
             // Calculate the gap indexes for the 4 threads in the data array
-            gap_index[i] = (unsigned int)(csv_struct_ptr->row_num / 4) * i * csv_struct_ptr->col_num;
+            gap_index[i] = (unsigned int)(csv_struct_ptr->row_num / 4) * i;
         }
 
         // Initiate the thread parameter
         for(i = 0; i < 4; i++)
         {
-            csv_conv_thread_init(&thread_parameter_arr[i], i, gap_index, txt_area_sets[i]);
+            csv_conv_thread_init(&thread_parameter_arr[i], i, gap_index, txt_area_sets[i], string_length_indicator, csv_struct_ptr);
         }
 
         // Execute the threads
@@ -278,8 +321,8 @@ extern int csv_writer(CSV_STRUCT *csv_struct_ptr)
         // Write contents into file
         for(i = 0; i < 4; i++)
         {
-            fseek(fp_new_csv, gap_index[i], SEEK_SET);
-            fwrite(txt_area_sets[i], gap_index[i + 1] - gap_index[i], 1, fp_new_csv);
+            fwrite(txt_area_sets[i], string_length_indicator[i], 1, fp_new_csv);
+            fseek(fp_new_csv, string_length_indicator[i], SEEK_CUR);
         }
         fseek(fp_new_csv, 0, SEEK_SET);
 
@@ -291,8 +334,53 @@ extern int csv_writer(CSV_STRUCT *csv_struct_ptr)
     }
     else
     {
+        // Variables for iteration on a single processing of a file.
+        unsigned int i, j;
+        unsigned int data_arr_num = csv_struct_ptr->row_num * csv_struct_ptr->col_num;
+        unsigned int string_space = data_arr_num * 32;
+        unsigned int string_length_indicator = 0;
+        char *txt_area = (char*)malloc(string_space);
+        
+        if(!txt_area)
+        {
+            fprintf(stderr, "Unable to allocate space for the data to string buffer!\n");
+            exit(1);
+        }
+        char *tmp_ptr = txt_area;
 
+        // Clear the space
+        memset(txt_area, 0, string_space);
+
+        // Write into the memory buffer
+        unsigned int iter_length_indicator = 0;
+        for(i = 0; i < csv_struct_ptr->row_num; i++)
+        {
+            unsigned int tmp_product = i * csv_struct_ptr->col_num;
+            for(j = 0; j < csv_struct_ptr->col_num; j++)
+            {
+                if(j < csv_struct_ptr->col_num - 1)
+                {
+                    sprintf(tmp_ptr, "%.8f,", csv_struct_ptr->result_data_arr[tmp_product + j]);
+                    iter_length_indicator = strlen(tmp_ptr);
+                    string_length_indicator += iter_length_indicator;
+                    tmp_ptr += (char*)iter_length_indicator;
+                }
+                else
+                {
+                    sprintf(tmp_ptr, "%.8f\n", csv_struct_ptr->result_data_arr[tmp_product + j]);
+                    iter_length_indicator = strlen(tmp_ptr);
+                    string_length_indicator += iter_length_indicator;
+                    tmp_ptr += (char*)iter_length_indicator;
+                }
+            }
+        }
+
+        // Push the content in the buffer into the file
+        fwrite(txt_area, string_length_indicator, 1, fp_new_csv);
+        free(txt_area);
     }
+
+    fclose(fp_new_csv);
 
     return 0;
 }
