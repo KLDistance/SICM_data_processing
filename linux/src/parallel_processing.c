@@ -79,9 +79,11 @@ extern int init_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr, unsigned int ro
 extern int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
 {
     // Set basic options to the parallel computation through array
-    int[L_PROPERTY_NUM] para_arr = {0};
-    para_arr[PL_RELATIVE_ROW] = 11;
-    para_arr[PL_RELATIVE_COL] = 11;
+    int para_arr[L_PROPERTY_NUM] = {0};
+    para_arr[PL_ARR_ROW_NUM] = gpu_data_2d_arr_ptr->row_num;
+    para_arr[PL_ARR_COL_NUM] = gpu_data_2d_arr_ptr->col_num;
+    para_arr[PL_RELATIVE_ROW] = 5;
+    para_arr[PL_RELATIVE_COL] = 5;
     para_arr[PL_CENTRAL_DRAG] = 1;
     
     // Calculate the data size and data number
@@ -132,9 +134,11 @@ extern int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_
 extern int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
 {
     // Set basic options to the parallel computation through array
-    int[L_PROPERTY_NUM] para_arr = {0};
-    para_arr[PL_RELATIVE_ROW] = 11;
-    para_arr[PL_RELATIVE_COL] = 11;
+    int para_arr[L_PROPERTY_NUM] = {0};
+    para_arr[PL_ARR_ROW_NUM] = gpu_data_2d_arr_ptr->row_num;
+    para_arr[PL_ARR_COL_NUM] = gpu_data_2d_arr_ptr->col_num;
+    para_arr[PL_RELATIVE_ROW] = 5;
+    para_arr[PL_RELATIVE_COL] = 5;
     para_arr[PL_CENTRAL_DRAG] = 1;
     para_arr[WL_DISTANCE_COEFFICIENT] = 2;
     
@@ -186,9 +190,11 @@ extern int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D
 extern int gpu_statistic_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
 {
     // Set basic options to the parallel computation through array
-    int[L_PROPERTY_NUM] para_arr = {0};
-    para_arr[PL_RELATIVE_ROW] = 11;
-    para_arr[PL_RELATIVE_COL] = 11;
+    int para_arr[L_PROPERTY_NUM] = {0};
+    para_arr[PL_ARR_ROW_NUM] = gpu_data_2d_arr_ptr->row_num;
+    para_arr[PL_ARR_COL_NUM] = gpu_data_2d_arr_ptr->col_num;
+    para_arr[PL_RELATIVE_ROW] = 5;
+    para_arr[PL_RELATIVE_COL] = 5;
     para_arr[PL_CENTRAL_DRAG] = 1;
     para_arr[WL_DISTANCE_COEFFICIENT] = 2;
     para_arr[SL_THRESHOLD] = 3;

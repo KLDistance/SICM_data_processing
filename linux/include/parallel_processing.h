@@ -9,18 +9,22 @@
 #include <time.h>
 
 // Define the property array entry pass into the GPU
-#define L_PROPERTY_NUM 5
+#define L_PROPERTY_NUM 7
 
-// Relative number of rows related
-#define PL_RELATIVE_ROW 0
-// Relative number of columns related
-#define PL_RELATIVE_COL 1
+// Array row number
+#define PL_ARR_ROW_NUM 0
+// Array column number
+#define PL_ARR_COL_NUM 1
+// Relative number of rows related in terms of the central point
+#define PL_RELATIVE_ROW 2
+// Relative number of columns related in terms of the central point
+#define PL_RELATIVE_COL 3
 // Reciprocal of the drag coefficient
-#define PL_CENTRAL_DRAG 2
+#define PL_CENTRAL_DRAG 4
 // Distance coefficient for weight laplacian distance
-#define WL_DISTANCE_COEFFICIENT 3
+#define WL_DISTANCE_COEFFICIENT 5
 // Threshold
-#define SL_THRESHOLD 4
+#define SL_THRESHOLD 6
 
 
 typedef struct
