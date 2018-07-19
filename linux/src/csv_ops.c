@@ -158,7 +158,7 @@ int from_file_short(char *file_str, CSV_STRUCT *csv_struct_ptr)
     return 0;
 }
 
-extern int csv_reader(CSV_STRUCT *csv_struct_ptr)
+int csv_reader(CSV_STRUCT *csv_struct_ptr)
 {
     FILE *pFile = NULL;
     unsigned int file_size = 0;
@@ -205,7 +205,7 @@ extern int csv_reader(CSV_STRUCT *csv_struct_ptr)
     return 0;
 }
 
-static int csv_conv_thread_init(THREAD_PARAMETER *lpParameter, unsigned int thread_id, unsigned int *common_arr, char *txt_area, unsigned int *strlen_indicator, CSV_STRUCT *csv_struct)
+static int csv_conv_thread_init(CSV_OPS_MULTITHREAD_PARAMETER *lpParameter, unsigned int thread_id, unsigned int *common_arr, char *txt_area, unsigned int *strlen_indicator, CSV_STRUCT *csv_struct)
 {
     lpParameter->common_arr = common_arr;
     lpParameter->def_thread_id = thread_id;
@@ -224,7 +224,7 @@ void* single_file_slice_proc(void *arg)
     unsigned int i, j;
     unsigned int tmp_product = 0;
     unsigned int iter_length_indicator = 0;
-    for(i = thread_parameter_ptr->commen_arr[thread_parameter_ptr->thread_id]; i < thread_parameter_ptr->common_arr[thread_parameter_ptr->thread_id + 1]; i++)
+    for(i = thread_parameter_ptr->common_arr[thread_parameter_ptr->def_thread_id]; i < thread_parameter_ptr->common_arr[thread_parameter_ptr->def_thread_id + 1]; i++)
     {
         tmp_product = i * thread_parameter_ptr->arr_col_num;
         for(j = 0; j < thread_parameter_ptr->arr_col_num; j++)
@@ -233,25 +233,25 @@ void* single_file_slice_proc(void *arg)
             {
                 sprintf(tmp_ptr, "%.8f,", thread_parameter_ptr->data_arr[tmp_product + j]);
                 iter_length_indicator = strlen(tmp_ptr);
-                thread_parameter_ptr->string_length_indicator[thread_parameter_ptr->thread_id] += iter_length_indicator;
-                tmp_ptr += (char*)iter_length_indicator;
+                thread_parameter_ptr->string_length_indicator[thread_parameter_ptr->def_thread_id] += iter_length_indicator;
+                tmp_ptr += iter_length_indicator;
             }
             else
             {
                 sprintf(tmp_ptr, "%.8f\n", thread_parameter_ptr->data_arr[tmp_product + j]);
                 iter_length_indicator = strlen(tmp_ptr);
-                thread_parameter_ptr->string_length_indicator[thread_parameter_ptr->thread_id] += iter_length_indicator;
-                tmp_ptr += (char*)iter_length_indicator;
+                thread_parameter_ptr->string_length_indicator[thread_parameter_ptr->def_thread_id] += iter_length_indicator;
+                tmp_ptr += iter_length_indicator;
             }
         }
     }
     return (void*)0;
 }
 
-extern int csv_writer(CSV_STRUCT *csv_struct_ptr)
+int csv_writer(CSV_STRUCT *csv_struct_ptr)
 {
     // File name process in case of name duplicates
-    char new_file_name[CSV_PATH_LEN] = {0};
+    char new_file_name[CSV_PATH_LEN + 8] = {0};
     sprintf(new_file_name, "proc_%s", csv_struct_ptr->csv_path);
 
     // Open empty file
@@ -363,14 +363,14 @@ extern int csv_writer(CSV_STRUCT *csv_struct_ptr)
                     sprintf(tmp_ptr, "%.8f,", csv_struct_ptr->result_data_arr[tmp_product + j]);
                     iter_length_indicator = strlen(tmp_ptr);
                     string_length_indicator += iter_length_indicator;
-                    tmp_ptr += (char*)iter_length_indicator;
+                    tmp_ptr += iter_length_indicator;
                 }
                 else
                 {
                     sprintf(tmp_ptr, "%.8f\n", csv_struct_ptr->result_data_arr[tmp_product + j]);
                     iter_length_indicator = strlen(tmp_ptr);
                     string_length_indicator += iter_length_indicator;
-                    tmp_ptr += (char*)iter_length_indicator;
+                    tmp_ptr += iter_length_indicator;
                 }
             }
         }

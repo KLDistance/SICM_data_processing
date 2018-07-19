@@ -1,6 +1,6 @@
 #include "parallel_processing.h"
 
-extern int init_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr)
+int init_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr)
 {
     // Read in the CL kernel file
     FILE *fp_kernel = NULL;
@@ -17,14 +17,14 @@ extern int init_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr)
     source_size = ftell(fp_kernel);
     fseek(fp_kernel, 0, SEEK_SET);
 
-    source_ptr = (char*)malloc(source_size);
-    if(!source_ptr)
+    source_str = (char*)malloc(source_size);
+    if(!source_str)
     {
         fprintf(stderr, "Unable to assign the space for CL kernel file!\n");
         fclose(fp_kernel);
         exit(1);
     }
-    memset(source_ptr, 0, source_size);
+    memset(source_str, 0, source_size);
 
     fread(source_str, source_size, 1, fp_kernel);
     fclose(fp_kernel);
@@ -32,23 +32,21 @@ extern int init_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr)
     gpu_com_struct_ptr->kernel_source_size = source_size;
 
     // Obtain the gpu platform and devices information
-    cl_platform_id platform_id = NULL;
-    cl_device_id device_id = NULL;
     cl_uint ret_num_devices;
     cl_uint ret_num_platform;
-    gpu_com_struct_ptr->cl_ret = clGetPlatformIDs(1, &platform_id, &ret_num_platform);
-    gpu_com_struct_ptr->cl_ret = clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_DEFAULT, 1, &device_id, &ret_num_devices);
+    gpu_com_struct_ptr->cl_ret = clGetPlatformIDs(1, &(gpu_com_struct_ptr->platform_id), &ret_num_platform);
+    gpu_com_struct_ptr->cl_ret = clGetDeviceIDs(gpu_com_struct_ptr->platform_id, CL_DEVICE_TYPE_DEFAULT, 1, &(gpu_com_struct_ptr->device_id), &ret_num_devices);
     
     // Create the context for OpenCL
-    gpu_com_struct_ptr->context = clCreateContext(NULL, 1, &device_id, NULL, NULL, &(gpu_com_struct_ptr->cl_ret));
+    gpu_com_struct_ptr->context = clCreateContext(NULL, 1, &(gpu_com_struct_ptr->device_id), NULL, NULL, &(gpu_com_struct_ptr->cl_ret));
 
     // Create the command queue
-    gpu_com_struct_ptr->command_queue = clCreateCommandQueueWithProperties(gpu_com_struct_ptr->context, device_id, 0, &(gpu_com_struct_ptr->cl_ret));
+    gpu_com_struct_ptr->command_queue = clCreateCommandQueueWithProperties(gpu_com_struct_ptr->context, gpu_com_struct_ptr->device_id, 0, &(gpu_com_struct_ptr->cl_ret));
 
     return 0;
 }
 
-extern int init_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr, unsigned int row_num, unsigned int col_num, float *data_arr)
+int init_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr, unsigned int row_num, unsigned int col_num, float *data_arr)
 {
     // Copy in the data into the gpu_data_2d_arr
     if(!data_arr) return -1;
@@ -65,7 +63,7 @@ extern int init_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr, unsigned int ro
         unsigned int tmp_iter = i * col_num;
         for(j = 0; j < col_num; j++)
         {
-            gpu_data_2d_arr_ptr[tmp_iter + j] = data_arr[tmp_iter + j];
+            gpu_data_2d_arr_ptr->input_data_arr[tmp_iter + j] = data_arr[tmp_iter + j];
         }
     }
     gpu_data_2d_arr_ptr->row_num = row_num;
@@ -76,7 +74,7 @@ extern int init_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr, unsigned int ro
     return 0;
 }
 
-extern int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
+int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
 {
     // Set basic options to the parallel computation through array
     int para_arr[L_PROPERTY_NUM] = {0};
@@ -96,8 +94,8 @@ extern int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_
     cl_mem para_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, L_PROPERTY_NUM * sizeof(int), para_arr, &(gpu_com_struct_ptr->cl_ret));
 
     // Copy the input and parameter array into the GPU memory
-    gpu_data_2d_arr_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, input_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->input_data_arr, 0, NULL, NULL);
-    gpu_data_2d_arr_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, parar_arr_mem, CL_TRUE, 0, L_PROPERTY * sizeof(int), para_arr, 0, NULL, NULL);
+    gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, input_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->input_data_arr, 0, NULL, NULL);
+    gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, para_arr_mem, CL_TRUE, 0, L_PROPERTY_NUM * sizeof(int), para_arr, 0, NULL, NULL);
 
     // Create program
     cl_program program = clCreateProgramWithSource(gpu_com_struct_ptr->context, 1, (const char**)&(gpu_com_struct_ptr->kernel_source_str), (const size_t*)&(gpu_com_struct_ptr->kernel_source_size), &(gpu_com_struct_ptr->cl_ret));
@@ -109,7 +107,7 @@ extern int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_
     // Set kernel parameters
     gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&(gpu_data_2d_arr_ptr->input_data_arr));
     gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void*)&(gpu_data_2d_arr_ptr->output_data_arr));
-    gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void*)&(gpu_data_2d_arr_ptr->para_arr));
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void*)&para_arr);
 
     // Execute the kernel
     size_t global_item_size = gpu_data_2d_arr_ptr->data_num;
@@ -131,7 +129,7 @@ extern int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_
     return 0;
 }
 
-extern int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
+int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
 {
     // Set basic options to the parallel computation through array
     int para_arr[L_PROPERTY_NUM] = {0};
@@ -152,8 +150,8 @@ extern int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D
     cl_mem para_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, L_PROPERTY_NUM * sizeof(int), para_arr, &(gpu_com_struct_ptr->cl_ret));
 
     // Copy the input and parameter array into the GPU memory
-    gpu_data_2d_arr_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, input_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->input_data_arr, 0, NULL, NULL);
-    gpu_data_2d_arr_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, parar_arr_mem, CL_TRUE, 0, L_PROPERTY * sizeof(int), para_arr, 0, NULL, NULL);
+    gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, input_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->input_data_arr, 0, NULL, NULL);
+    gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, para_arr_mem, CL_TRUE, 0, L_PROPERTY_NUM * sizeof(int), para_arr, 0, NULL, NULL);
 
     // Create program
     cl_program program = clCreateProgramWithSource(gpu_com_struct_ptr->context, 1, (const char**)&(gpu_com_struct_ptr->kernel_source_str), (const size_t*)&(gpu_com_struct_ptr->kernel_source_size), &(gpu_com_struct_ptr->cl_ret));
@@ -165,7 +163,7 @@ extern int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D
     // Set kernel parameters
     gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&(gpu_data_2d_arr_ptr->input_data_arr));
     gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void*)&(gpu_data_2d_arr_ptr->output_data_arr));
-    gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void*)&(gpu_data_2d_arr_ptr->para_arr));
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void*)&para_arr);
 
     // Execute the kernel
     size_t global_item_size = gpu_data_2d_arr_ptr->data_num;
@@ -187,7 +185,7 @@ extern int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D
     return 0;
 }
 
-extern int gpu_statistic_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
+int gpu_statistic_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
 {
     // Set basic options to the parallel computation through array
     int para_arr[L_PROPERTY_NUM] = {0};
@@ -209,8 +207,8 @@ extern int gpu_statistic_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_
     cl_mem para_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, L_PROPERTY_NUM * sizeof(int), para_arr, &(gpu_com_struct_ptr->cl_ret));
 
     // Copy the input and parameter array into the GPU memory
-    gpu_data_2d_arr_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, input_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->input_data_arr, 0, NULL, NULL);
-    gpu_data_2d_arr_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, parar_arr_mem, CL_TRUE, 0, L_PROPERTY * sizeof(int), para_arr, 0, NULL, NULL);
+    gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, input_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->input_data_arr, 0, NULL, NULL);
+    gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, para_arr_mem, CL_TRUE, 0, L_PROPERTY_NUM * sizeof(int), para_arr, 0, NULL, NULL);
 
     // Create program
     cl_program program = clCreateProgramWithSource(gpu_com_struct_ptr->context, 1, (const char**)&(gpu_com_struct_ptr->kernel_source_str), (const size_t*)&(gpu_com_struct_ptr->kernel_source_size), &(gpu_com_struct_ptr->cl_ret));
@@ -222,7 +220,7 @@ extern int gpu_statistic_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_
     // Set kernel parameters
     gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&(gpu_data_2d_arr_ptr->input_data_arr));
     gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void*)&(gpu_data_2d_arr_ptr->output_data_arr));
-    gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void*)&(gpu_data_2d_arr_ptr->para_arr));
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void*)&para_arr);
 
     // Execute the kernel
     size_t global_item_size = gpu_data_2d_arr_ptr->data_num;
@@ -244,7 +242,7 @@ extern int gpu_statistic_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_
     return 0;
 }
 
-extern int destroy_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr)
+int destroy_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr)
 {
     // Destroy the global CL objects
     gpu_com_struct_ptr->cl_ret = clReleaseCommandQueue(gpu_com_struct_ptr->command_queue);
@@ -253,7 +251,7 @@ extern int destroy_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr)
     return 0;
 }
 
-extern int destroy_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
+int destroy_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
 {
     // Clear the dynamic-allocated memory
     if(gpu_data_2d_arr_ptr->input_data_arr)
@@ -263,7 +261,7 @@ extern int destroy_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
     }
     if(gpu_data_2d_arr_ptr->output_data_arr)
     {
-        free(gpu_data-2d_arr_ptr->output_data_arr);
+        free(gpu_data_2d_arr_ptr->output_data_arr);
         gpu_data_2d_arr_ptr->output_data_arr = NULL;
     }
 

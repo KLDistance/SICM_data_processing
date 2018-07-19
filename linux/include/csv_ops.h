@@ -21,24 +21,24 @@
 // Thread identifier
 typedef struct
 {
-    unsigned int *string_length_indicator,
-    unsigned int *common_arr,
-    unsigned int def_thread_id,
-    unsigned int arr_row_num,
-    unsigned int arr_col_num,
-    float *data_arr,
-    char *txt_area
+    unsigned int *string_length_indicator;
+    unsigned int *common_arr;
+    unsigned int def_thread_id;
+    unsigned int arr_row_num;
+    unsigned int arr_col_num;
+    float *data_arr;
+    char *txt_area;
 } CSV_OPS_MULTITHREAD_PARAMETER;
 
 // Define .csv file struct
 typedef struct
 {
-    char csv_path[CSV_PATH_LEN],
-    unsigned int row_num,
-    unsigned int col_num,
-    void *data_arr,
-    float *result_data_arr,
-    char csv_data_type
+    char csv_path[CSV_PATH_LEN];
+    unsigned int row_num;
+    unsigned int col_num;
+    void *data_arr;
+    float *result_data_arr;
+    char csv_data_type;
 } CSV_STRUCT;
 
 int get_csv_arr_size(char *data_str, CSV_STRUCT *csv_struct_ptr);
