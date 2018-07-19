@@ -47,6 +47,7 @@ int from_file_float(char *file_str, CSV_STRUCT *csv_struct_ptr);
 int from_file_int(char *file_str, CSV_STRUCT *csv_struct_ptr);
 int from_file_short(char *file_str, CSV_STRUCT *csv_struct_ptr);
 
+extern int init_csv_struct(CSV_STRUCT *csv_struct_ptr, char *file_path, char csv_data_type);
 extern int csv_reader(CSV_STRUCT *csv_struct_ptr);
 extern int csv_writer(CSV_STRUCT *csv_struct_ptr);
 

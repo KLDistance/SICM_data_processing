@@ -9,7 +9,8 @@ int get_csv_arr_size(char *data_str, CSV_STRUCT *csv_struct_ptr)
     // Detect the column number
     for(i = 0; i < dataStrLen; i++)
     {
-        if(*(tmp++) == ',')
+        tmp++;
+        if(*tmp == ',')
         {
             csv_struct_ptr->col_num++;
         }
@@ -23,7 +24,7 @@ int get_csv_arr_size(char *data_str, CSV_STRUCT *csv_struct_ptr)
     // Detect the row number
     for(i = 0; i < dataStrLen; i++)
     {
-        if(*(tmp++) == '\n')
+        if(*tmp == '\n')
         {
             csv_struct_ptr->row_num++;
         }
@@ -31,7 +32,9 @@ int get_csv_arr_size(char *data_str, CSV_STRUCT *csv_struct_ptr)
         {
             break;
         }
+        tmp++;
     }
+    printf("%u rows %u columns...\n", csv_struct_ptr->row_num, csv_struct_ptr->col_num);
     return 0;
 }
 
@@ -158,6 +161,16 @@ int from_file_short(char *file_str, CSV_STRUCT *csv_struct_ptr)
     return 0;
 }
 
+int init_csv_struct(CSV_STRUCT *csv_struct_ptr, char *file_path, char csv_data_type)
+{
+    csv_struct_ptr->csv_data_type = csv_data_type;
+    memset(csv_struct_ptr->csv_path, 0, CSV_PATH_LEN);
+    strncpy(csv_struct_ptr->csv_path, file_path, strlen(file_path) < CSV_PATH_LEN ? strlen(file_path) : CSV_PATH_LEN);
+    csv_struct_ptr->row_num = 0;
+    csv_struct_ptr->col_num = 0;
+    return 0;
+}
+
 int csv_reader(CSV_STRUCT *csv_struct_ptr)
 {
     FILE *pFile = NULL;
@@ -244,15 +257,22 @@ void* single_file_slice_proc(void *arg)
                 tmp_ptr += iter_length_indicator;
             }
         }
+        //printf("%u, %u\n", thread_parameter_ptr->def_thread_id, i);
     }
+    printf("Thread ends. %u -- %u\n", thread_parameter_ptr->common_arr[thread_parameter_ptr->def_thread_id], i);
     return (void*)0;
 }
 
 int csv_writer(CSV_STRUCT *csv_struct_ptr)
 {
     // File name process in case of name duplicates
-    char new_file_name[CSV_PATH_LEN + 8] = {0};
-    sprintf(new_file_name, "proc_%s", csv_struct_ptr->csv_path);
+    char new_file_name[CSV_PATH_LEN + 16] = {0};
+    memset(new_file_name, 0, CSV_PATH_LEN + 16);
+
+    // Find the "." before the type
+    sprintf(new_file_name, "%s", csv_struct_ptr->csv_path);
+    memset(new_file_name + strlen(csv_struct_ptr->csv_path) - 4, 0, 4);
+    strncat(new_file_name, "_proc.csv", strlen("_proc.csv"));
 
     // Open empty file
     FILE *fp_new_csv = fopen(new_file_name, "w");
@@ -277,7 +297,7 @@ int csv_writer(CSV_STRUCT *csv_struct_ptr)
         CSV_OPS_MULTITHREAD_PARAMETER thread_parameter_arr[4];
         
         // Set terminal array position
-        gap_index[4] = data_arr_num;
+        gap_index[4] = csv_struct_ptr->row_num;
 
         for(i = 0; i < 4; i++)
         {
@@ -297,7 +317,7 @@ int csv_writer(CSV_STRUCT *csv_struct_ptr)
             // Calculate the gap indexes for the 4 threads in the data array
             gap_index[i] = (unsigned int)(csv_struct_ptr->row_num / 4) * i;
         }
-
+        
         // Initiate the thread parameter
         for(i = 0; i < 4; i++)
         {
@@ -310,7 +330,7 @@ int csv_writer(CSV_STRUCT *csv_struct_ptr)
             pthread_create(&csv_conv_thread_arr[i], NULL, single_file_slice_proc, (void*)&(thread_parameter_arr[i]));
         }
 
-        usleep(100000);
+        usleep(500000);
 
         // Wait for the joints of the subthreads
         for(i = 0; i < 4; i++)
