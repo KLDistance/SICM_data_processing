@@ -189,6 +189,7 @@ int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR 
     size_t global_item_size = gpu_data_2d_arr_ptr->data_num;
     size_t local_item_size = 64;
     gpu_com_struct_ptr->cl_ret = clEnqueueNDRangeKernel(gpu_com_struct_ptr->command_queue, kernel, 1, NULL, &global_item_size, &local_item_size, 0, NULL, NULL);
+    printf("%d\n", gpu_com_struct_ptr->cl_ret);
 
     // Read RAM buffer output_arr_mem input the local buffer output_data_arr
     gpu_com_struct_ptr->cl_ret = clEnqueueReadBuffer(gpu_com_struct_ptr->command_queue, output_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->output_data_arr, 0, NULL, NULL);
@@ -201,7 +202,19 @@ int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR 
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(input_arr_mem);
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(output_arr_mem);
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(para_arr_mem);
-
+    /*
+    unsigned int i, j;
+    for(i = 0; i < gpu_data_2d_arr_ptr->row_num; i++)
+    {
+        unsigned int tmp_product = i * gpu_data_2d_arr_ptr->col_num;
+        for(j = 0; j < gpu_data_2d_arr_ptr->col_num; j++)
+        {
+            printf("\t%f", gpu_data_2d_arr_ptr->output_data_arr[tmp_product + j]);
+        }
+        printf("\n");
+    }
+    */
+   printf("%u\n", gpu_data_2d_arr_ptr->data_size);
     return 0;
 }
 
@@ -258,18 +271,18 @@ int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *g
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(input_arr_mem);
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(output_arr_mem);
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(para_arr_mem);
-    /*
+    
     unsigned int i, j;
     for(i = 0; i < gpu_data_2d_arr_ptr->row_num; i++)
     {
         unsigned int tmp_product = i * gpu_data_2d_arr_ptr->col_num;
         for(j = 0; j < gpu_data_2d_arr_ptr->col_num; j++)
         {
-            printf("\t%f", gpu_data_2d_arr_ptr->output_data_arr[tmp_product + j]);
+            printf("\t%f", gpu_data_2d_arr_ptr->input_data_arr[tmp_product + j]);
         }
         printf("\n");
     }
-    */
+    
     return 0;
 }
 
@@ -334,7 +347,6 @@ int destroy_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr)
     // Destroy the global CL objects
     gpu_com_struct_ptr->cl_ret = clReleaseCommandQueue(gpu_com_struct_ptr->command_queue);
     gpu_com_struct_ptr->cl_ret = clReleaseContext(gpu_com_struct_ptr->context);
-
     return 0;
 }
 

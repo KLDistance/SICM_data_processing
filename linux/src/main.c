@@ -31,7 +31,7 @@ int smooth_function()
 
 int main(void)
 {
-    //check_gpu_info();
+    check_gpu_info();
     smooth_function();
     return 0;
 }

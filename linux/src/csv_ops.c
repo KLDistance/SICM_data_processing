@@ -45,6 +45,7 @@ int from_file_float(char *file_str, CSV_STRUCT *csv_struct_ptr)
     char tmp_buf[BUF_LEN] = {0};
     unsigned int i, j;
     unsigned int tmp_len = 0;
+    unsigned int tmp_product = 0;
 
     // Assign the space for csv_struct_ptr data array
     float *data_arr = (float*)malloc(csv_struct_ptr->row_num * csv_struct_ptr->col_num * sizeof(float));
@@ -56,16 +57,17 @@ int from_file_float(char *file_str, CSV_STRUCT *csv_struct_ptr)
 
     for(i = 0; i < csv_struct_ptr->row_num; i++)
     {
-        for(j = 0; j < csv_struct_ptr->row_num; j++)
+        tmp_product = csv_struct_ptr->col_num * i;
+        for(j = 0; j < csv_struct_ptr->col_num; j++)
         {
             memset(tmp_buf, 0, BUF_LEN);
-            for(tmp_back = tmp_front; *tmp_front != 0; tmp_front++)
+            for(tmp_back = tmp_front; *tmp_front != '\0'; tmp_front++)
             {
-                if(*tmp_front = ',' || *tmp_front == '\n')
+                if(*tmp_front == ',' || *tmp_front == '\n' || *tmp_front == 0)
                 {
                     tmp_len = (unsigned int)(tmp_front++ - tmp_back);
                     strncpy(tmp_buf, tmp_back, tmp_len);
-                    data_arr[csv_struct_ptr->col_num * i + j] = atof(tmp_buf);
+                    data_arr[tmp_product + j] = atof(tmp_buf);
                     tmp_back = tmp_front;
                     break;
                 }
@@ -86,6 +88,7 @@ int from_file_int(char *file_str, CSV_STRUCT *csv_struct_ptr)
     char tmp_buf[BUF_LEN] = {0};
     unsigned int i, j;
     unsigned int tmp_len = 0;
+    unsigned int tmp_product = 0;
 
     // Assign the space for csv_struct_ptr data array
     int *data_arr = (int*)malloc(csv_struct_ptr->row_num * csv_struct_ptr->col_num * sizeof(int));
@@ -97,16 +100,17 @@ int from_file_int(char *file_str, CSV_STRUCT *csv_struct_ptr)
 
     for(i = 0; i < csv_struct_ptr->row_num; i++)
     {
-        for(j = 0; j < csv_struct_ptr->row_num; j++)
+        tmp_product = csv_struct_ptr->col_num * i;
+        for(j = 0; j < csv_struct_ptr->col_num; j++)
         {
             memset(tmp_buf, 0, BUF_LEN);
             for(tmp_back = tmp_front; *tmp_front != 0; tmp_front++)
             {
-                if(*tmp_front = ',' || *tmp_front == '\n')
+                if(*tmp_front == ',' || *tmp_front == '\n' || *tmp_front == 0)
                 {
                     tmp_len = (unsigned int)(tmp_front++ - tmp_back);
                     strncpy(tmp_buf, tmp_back, tmp_len);
-                    data_arr[csv_struct_ptr->col_num * i + j] = atof(tmp_buf);
+                    data_arr[tmp_product + j] = atof(tmp_buf);
                     tmp_back = tmp_front;
                     break;
                 }
@@ -127,6 +131,7 @@ int from_file_short(char *file_str, CSV_STRUCT *csv_struct_ptr)
     char tmp_buf[BUF_LEN] = {0};
     unsigned int i, j;
     unsigned int tmp_len = 0;
+    unsigned int tmp_product = 0;
 
     // Allocate space for csv_struct_ptr data array
     short *data_arr = (short*)malloc(csv_struct_ptr->row_num * csv_struct_ptr->col_num * sizeof(short));
@@ -138,16 +143,17 @@ int from_file_short(char *file_str, CSV_STRUCT *csv_struct_ptr)
 
     for(i = 0; i < csv_struct_ptr->row_num; i++)
     {
-        for(j = 0; j < csv_struct_ptr->row_num; j++)
+        tmp_product = csv_struct_ptr->col_num * i;
+        for(j = 0; j < csv_struct_ptr->col_num; j++)
         {
             memset(tmp_buf, 0, BUF_LEN);
             for(tmp_back = tmp_front; *tmp_front != 0; tmp_front++)
             {
-                if(*tmp_front = ',' || *tmp_front == '\n')
+                if(*tmp_front == ',' || *tmp_front == '\n' || *tmp_front == 0)
                 {
                     tmp_len = (unsigned int)(tmp_front++ - tmp_back);
                     strncpy(tmp_buf, tmp_back, tmp_len);
-                    data_arr[csv_struct_ptr->col_num * i + j] = atof(tmp_buf);
+                    data_arr[tmp_product + j] = atof(tmp_buf);
                     tmp_back = tmp_front;
                     break;
                 }
