@@ -48,6 +48,7 @@ typedef struct
     float *output_data_arr;
 } GPU_DATA_2D_ARR;
 
+extern int check_gpu_info();
 extern int init_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr);
 extern int init_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr, unsigned int row_num, unsigned int col_num, float *data_arr);
 extern int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr);

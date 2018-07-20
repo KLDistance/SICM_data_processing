@@ -26,10 +26,12 @@ int smooth_function()
     destroy_gpu_2d_arr(&gpu_data_2d_arr);
     destroy_gpu_state(&gpu_com_struct);
 
+    return 0;
 }
 
 int main(void)
 {
+    check_gpu_info();
     smooth_function();
     return 0;
 }

@@ -1,4 +1,6 @@
-__kernel void primitive_laplacian(__global float *input_data_arr, __global float *output_data_arr, __global int *para_arr)
+#pragma OPENCL EXTENSION cl_khr_byte_addressable_store:enable\n
+
+__kernel void primitive_laplacian(__global float *input_data_arr, __global int *para_arr__global, float *output_data_arr)
 {
     int gpu_global_index = get_global_id(0);
 
@@ -35,7 +37,7 @@ __kernel void primitive_laplacian(__global float *input_data_arr, __global float
     }
 }
 
-__kernel void weighed_laplacian(__global float *input_data_arr, __global float *output_data_arr, __global int *para_arr)
+__kernel void weighed_laplacian(__global float *input_data_arr, __global int *para_arr__global, float *output_data_arr)
 {
     int gpu_global_index = get_global_id(0);
 
@@ -75,7 +77,7 @@ __kernel void weighed_laplacian(__global float *input_data_arr, __global float *
 }
 
 // Unfinished!
-__kernel void statistic_laplacian(__global float *input_data_arr, __global float *output_data_arr, __global int *para_arr)
+__kernel void statistic_laplacian(__global float *input_data_arr, __global int *para_arr__global, float *output_data_arr)
 {
     int gpu_global_index = get_global_id(0);
 

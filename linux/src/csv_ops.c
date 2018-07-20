@@ -34,7 +34,7 @@ int get_csv_arr_size(char *data_str, CSV_STRUCT *csv_struct_ptr)
         }
         tmp++;
     }
-    printf("%u rows %u columns...\n", csv_struct_ptr->row_num, csv_struct_ptr->col_num);
+    printf(".csv contains %u rows %u columns of data.\n", csv_struct_ptr->row_num, csv_struct_ptr->col_num);
     return 0;
 }
 
@@ -128,7 +128,7 @@ int from_file_short(char *file_str, CSV_STRUCT *csv_struct_ptr)
     unsigned int i, j;
     unsigned int tmp_len = 0;
 
-    // Assign the space for csv_struct_ptr data array
+    // Allocate space for csv_struct_ptr data array
     short *data_arr = (short*)malloc(csv_struct_ptr->row_num * csv_struct_ptr->col_num * sizeof(short));
     if(!data_arr)
     {
@@ -257,9 +257,8 @@ void* single_file_slice_proc(void *arg)
                 tmp_ptr += iter_length_indicator;
             }
         }
-        //printf("%u, %u\n", thread_parameter_ptr->def_thread_id, i);
     }
-    printf("Thread ends. %u -- %u\n", thread_parameter_ptr->common_arr[thread_parameter_ptr->def_thread_id], i);
+    printf("Writer thread %u (%u -- %u) ends.\n", thread_parameter_ptr->def_thread_id, thread_parameter_ptr->common_arr[thread_parameter_ptr->def_thread_id], i);
     return (void*)0;
 }
 
