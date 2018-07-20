@@ -17,7 +17,7 @@ int smooth_function()
     init_gpu_state(&gpu_com_struct);
 
     // Calculation
-    gpu_weighed_laplacian(&gpu_com_struct, &gpu_data_2d_arr);
+    gpu_primitive_laplacian(&gpu_com_struct, &gpu_data_2d_arr);
 
     // Write data array into a new csv file
     csv_struct.result_data_arr = gpu_data_2d_arr.output_data_arr;
@@ -31,7 +31,7 @@ int smooth_function()
 
 int main(void)
 {
-    check_gpu_info();
+    //check_gpu_info();
     smooth_function();
     return 0;
 }

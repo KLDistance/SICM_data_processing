@@ -163,9 +163,10 @@ int from_file_short(char *file_str, CSV_STRUCT *csv_struct_ptr)
 
 int init_csv_struct(CSV_STRUCT *csv_struct_ptr, char *file_path, char csv_data_type)
 {
+    unsigned int file_path_len = strlen(file_path);
     csv_struct_ptr->csv_data_type = csv_data_type;
     memset(csv_struct_ptr->csv_path, 0, CSV_PATH_LEN);
-    strncpy(csv_struct_ptr->csv_path, file_path, strlen(file_path) < CSV_PATH_LEN ? strlen(file_path) : CSV_PATH_LEN);
+    strncpy(csv_struct_ptr->csv_path, file_path, file_path_len < CSV_PATH_LEN ? file_path_len : CSV_PATH_LEN);
     csv_struct_ptr->row_num = 0;
     csv_struct_ptr->col_num = 0;
     return 0;
