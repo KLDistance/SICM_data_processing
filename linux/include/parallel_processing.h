@@ -6,6 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <CL/cl.h>
+#include <CL/cl_gl.h>
 #include <time.h>
 
 // Define the property array entry pass into the GPU

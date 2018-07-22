@@ -1,6 +1,6 @@
 __kernel void primitive_laplacian(__global float *input_data_arr, __global int *para_arr, __global float *output_data_arr)
 {
-    int gpu_global_index = get_global_id(0);
+    unsigned int gpu_global_index = get_global_id(0);
 
     // Calculation
 
@@ -20,7 +20,7 @@ __kernel void primitive_laplacian(__global float *input_data_arr, __global int *
         // Inner region goes primitive laplacian
         unsigned int i, j;
         unsigned int k = 0;
-        float delta_surrounding = 0;
+        float sum_surrounding = 0;
         unsigned int tmp_product = 0;
         for(i = presRow - para_arr[2]; i < presRow + para_arr[2]; i++)
         {
@@ -29,10 +29,10 @@ __kernel void primitive_laplacian(__global float *input_data_arr, __global int *
             {
                 if(i == presRow && j == presCol) continue;
                 k++;
-                delta_surrounding += (input_data_arr[tmp_product + j] - input_data_arr[gpu_global_index]);
+                sum_surrounding += input_data_arr[tmp_product + j];
             }
         }
-        output_data_arr[gpu_global_index] -= (delta_surrounding / (float)k / (float)para_arr[4]);
+        output_data_arr[gpu_global_index] = (sum_surrounding / (float)k / (float)para_arr[4]);
     }
 }
 

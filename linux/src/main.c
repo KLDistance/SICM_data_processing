@@ -15,7 +15,7 @@ int smooth_function()
     // Initiate 2d array for GPU calculation
     init_gpu_2d_arr(&gpu_data_2d_arr, csv_struct.row_num, csv_struct.col_num, (float*)csv_struct.data_arr);
     init_gpu_state(&gpu_com_struct);
-
+    
     // Calculation
     gpu_primitive_laplacian(&gpu_com_struct, &gpu_data_2d_arr);
 
@@ -31,7 +31,7 @@ int smooth_function()
 
 int main(void)
 {
-    check_gpu_info();
+    //check_gpu_info();
     smooth_function();
     return 0;
 }
