@@ -8,32 +8,30 @@ __kernel void primitive_laplacian(__global float *input_data_arr, __global int *
     unsigned int presRow = gpu_global_index / para_arr[1];
     // Present column index for the data
     unsigned int presCol = gpu_global_index % para_arr[1];
+    
+    // Define the border of the edge points
+    unsigned int left_border = (presRow < para_arr[2]) ? 0 : (presRow - para_arr[2]);
+    unsigned int right_border = (presRow >= para_arr[0] - para_arr[2]) ? para_arr[0] : (presRow + para_arr[2]);
+    unsigned int upper_border = (presCol < para_arr[3]) ? 0 : (presCol - para_arr[3]);
+    unsigned int bottom_border = (presCol >= para_arr[1] - para_arr[3]) ? para_arr[1] : (presCol + para_arr[3]);
 
-    // Judge whether present point is able to execute a thorough laplacian process
-    if(presRow < para_arr[2] || presRow > para_arr[0] - para_arr[2] || presCol < para_arr[3] || presCol > para_arr[1] - para_arr[3])
+    // Inner region goes primitive laplacian
+    unsigned int i, j;
+    unsigned int k = 0;
+    float sum_surrounding = 0;
+    unsigned int tmp_product = 0;
+    for(i = left_border; i < right_border; i++)
     {
-        // On the edge region, go without any handle
-        output_data_arr[gpu_global_index] = input_data_arr[gpu_global_index];
-    }
-    else
-    {
-        // Inner region goes primitive laplacian
-        unsigned int i, j;
-        unsigned int k = 0;
-        float sum_surrounding = 0;
-        unsigned int tmp_product = 0;
-        for(i = presRow - para_arr[2]; i < presRow + para_arr[2]; i++)
+        tmp_product = i * ((para_arr[3] << 1) + 1);
+        for(j = upper_border; j < bottom_border; j++)
         {
-            tmp_product = i * ((para_arr[3] << 1) + 1);
-            for(j = presCol - para_arr[3]; j < presCol + para_arr[3]; j++)
-            {
-                if(i == presRow && j == presCol) continue;
-                k++;
-                sum_surrounding += input_data_arr[tmp_product + j];
-            }
+            if(i == presRow && j == presCol) continue;
+            k++;
+            sum_surrounding += input_data_arr[tmp_product + j];
         }
-        output_data_arr[gpu_global_index] = (sum_surrounding / (float)k / (float)para_arr[4]);
     }
+    output_data_arr[gpu_global_index] = (sum_surrounding / (float)k);
+    
 }
 
 __kernel void weighed_laplacian(__global float *input_data_arr, __global int *para_arr, __global float *output_data_arr)

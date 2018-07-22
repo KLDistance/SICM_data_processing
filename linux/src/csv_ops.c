@@ -40,8 +40,8 @@ int get_csv_arr_size(char *data_str, CSV_STRUCT *csv_struct_ptr)
 
 int from_file_float(char *file_str, CSV_STRUCT *csv_struct_ptr)
 {
-    char *tmp_front = file_str;
-    char *tmp_back = file_str;
+    char *tmp_front = file_str + 3;
+    char *tmp_back = file_str + 3; // The header of csv is EF BB BF, which should be jumped over!
     char tmp_buf[BUF_LEN] = {0};
     unsigned int i, j;
     unsigned int tmp_len = 0;
@@ -83,8 +83,8 @@ int from_file_float(char *file_str, CSV_STRUCT *csv_struct_ptr)
 
 int from_file_int(char *file_str, CSV_STRUCT *csv_struct_ptr)
 {
-    char *tmp_front = file_str;
-    char *tmp_back = file_str;
+    char *tmp_front = file_str + 3;
+    char *tmp_back = file_str + 3;
     char tmp_buf[BUF_LEN] = {0};
     unsigned int i, j;
     unsigned int tmp_len = 0;
@@ -126,8 +126,8 @@ int from_file_int(char *file_str, CSV_STRUCT *csv_struct_ptr)
 
 int from_file_short(char *file_str, CSV_STRUCT *csv_struct_ptr)
 {
-    char *tmp_front = file_str;
-    char *tmp_back = file_str;
+    char *tmp_front = file_str + 3;
+    char *tmp_back = file_str + 3;
     char tmp_buf[BUF_LEN] = {0};
     unsigned int i, j;
     unsigned int tmp_len = 0;
@@ -281,6 +281,7 @@ int csv_writer(CSV_STRUCT *csv_struct_ptr)
     strncat(new_file_name, "_proc.csv", strlen("_proc.csv"));
 
     // Open empty file
+    char csv_header[3] = {0xEF, 0xBB, 0xBF};
     FILE *fp_new_csv = fopen(new_file_name, "w");
     if(!fp_new_csv)
     {
@@ -345,6 +346,8 @@ int csv_writer(CSV_STRUCT *csv_struct_ptr)
         }
 
         // Write contents into file
+        fwrite(csv_header, 3, 1, fp_new_csv);
+        fseek(fp_new_csv, 3, SEEK_SET);
         for(i = 0; i < 4; i++)
         {
             fwrite(txt_area_sets[i], string_length_indicator[i], 1, fp_new_csv);
@@ -402,7 +405,10 @@ int csv_writer(CSV_STRUCT *csv_struct_ptr)
         }
 
         // Push the content in the buffer into the file
+        fwrite(csv_header, 3, 1, fp_new_csv);
+        fseek(fp_new_csv, 3, SEEK_SET);
         fwrite(txt_area, string_length_indicator, 1, fp_new_csv);
+        fseek(fp_new_csv, 0, SEEK_SET);
         free(txt_area);
     }
 

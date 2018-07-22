@@ -2,14 +2,14 @@
 #include "parallel_processing.h"
 #include "csv_ops.h"
 
-int smooth_function()
+int smooth_function(char *file_path, char *proc_type)
 {
     GPU_COM_STRUCT gpu_com_struct;
     GPU_DATA_2D_ARR gpu_data_2d_arr;
     CSV_STRUCT csv_struct;
 
     // Read from csv file
-    init_csv_struct(&csv_struct, "data_files/OverallGrid.csv", 0);
+    init_csv_struct(&csv_struct, file_path, 0);
     csv_reader(&csv_struct);
 
     // Initiate 2d array for GPU calculation
@@ -29,9 +29,14 @@ int smooth_function()
     return 0;
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
+    if(argc != 2)
+    {
+        fprintf(stderr, "-usage:%s [original .csv file]\n", argv[0]);
+        exit(1);
+    }
     //check_gpu_info();
-    smooth_function();
+    smooth_function(argv[1], NULL);
     return 0;
 }
