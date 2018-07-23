@@ -29,6 +29,9 @@
 // Threshold
 #define SL_THRESHOLD 7
 
+// Define max number of programs in the kernel
+#define MAX_PROGRAM_NUM 256
+
 
 typedef struct
 {
@@ -39,6 +42,10 @@ typedef struct
     cl_device_id device_id;
     cl_context context;
     cl_command_queue command_queue;
+    size_t program_num;
+    char *func_name[MAX_PROGRAM_NUM];
+    cl_program program_arr[MAX_PROGRAM_NUM];
+    cl_kernel kernel_arr[MAX_PROGRAM_NUM];
 } GPU_COM_STRUCT;
 
 typedef struct
@@ -54,10 +61,13 @@ typedef struct
 extern int check_gpu_info();
 extern int init_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr);
 extern int init_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr, unsigned int row_num, unsigned int col_num, float *data_arr);
+extern int append_gpu_program(GPU_COM_STRUCT *gpu_com_struct_ptr, char *func_name);
+extern int gpu_slope_diminish(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr);
 extern int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr);
 extern int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr);
 extern int gpu_statistic_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr);
 extern int destroy_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr);
+extern int destroy_gpu_program_array(GPU_COM_STRUCT *gpu_com_struct_ptr);
 extern int destroy_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr);
 
 #endif

@@ -15,6 +15,9 @@ int smooth_function(char *file_path, char *proc_type)
     // Initiate 2d array for GPU calculation
     init_gpu_2d_arr(&gpu_data_2d_arr, csv_struct.row_num, csv_struct.col_num, (float*)csv_struct.data_arr);
     init_gpu_state(&gpu_com_struct);
+
+    // Slope diminish
+    gpu_slope_diminish(&gpu_com_struct, &gpu_data_2d_arr);
     
     // Calculation
     gpu_primitive_laplacian(&gpu_com_struct, &gpu_data_2d_arr);
@@ -24,6 +27,7 @@ int smooth_function(char *file_path, char *proc_type)
     csv_writer(&csv_struct);
 
     destroy_gpu_2d_arr(&gpu_data_2d_arr);
+    destroy_gpu_program_array(&gpu_com_struct);
     destroy_gpu_state(&gpu_com_struct);
 
     return 0;

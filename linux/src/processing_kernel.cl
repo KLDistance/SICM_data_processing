@@ -6,19 +6,23 @@ __kernel void slope_diminish(__global float *input_data_arr, __global int *para_
     unsigned int presRow = gpu_global_index / para_arr[1];
     // Present column index for the data
     unsigned int presCol = gpu_global_index % para_arr[1];
+    // Segmentation of the y direction into pieces, each with 16 columns
+    unsigned int pres_slot = (presCol) / 16;
+    unsigned int real_num_slot_column = ((pres_slot << 4) > para_arr[1]) ? (para_arr[1]) : (pres_slot << 4);
 
-    // Find the 4 corners of the image and calculate the compensation slope
-    float x_zero_to_max_slope = (float)(input_data_arr[para_arr[1] - 1] - input_data_arr[0]) / (float)para_arr[1];
-    float y_zero_to_max_slope = (float)(input_data_arr[para_arr[2] + 1 - para_arr[1]] - input_data_arr[0] / (float)para[0]);
+    // Left edge point entry
+    unsigned int left_entry = pres_slot;
+    // Right edge point entry
+    unsigned int right_entry = pres_slot + 1;
+    // Decide the slot length
 
-    // Compensate the present point with specific value according to the x and y slope
-    output_data_arr[gpu_global_index] = input_data_arr[gpu_global_index] - x_zero_to_max_slope * presCol - y_zero_to_max_slope * presRow;
+
 }
 
 __kernel void primitive_laplacian(__global float *input_data_arr, __global int *para_arr, __global float *output_data_arr)
 {
     unsigned int gpu_global_index = get_global_id(0);
-
+    /*
     // Calculation
 
     // Present row index for the data
@@ -56,6 +60,8 @@ __kernel void primitive_laplacian(__global float *input_data_arr, __global int *
     {
         output_data_arr[gpu_global_index] = (sum_surrounding / (float)k);
     }
+    */
+    output_data_arr[gpu_global_index] = input_data_arr[gpu_global_index];
 }
 
 // Unfinished!

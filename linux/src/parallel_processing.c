@@ -120,8 +120,31 @@ int init_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr)
     // Since there is OpenCL 1.1, use "clCreateCommandQueue"
     // After OpenCL 2.0, use "clCreateCommandQueueWithProperties" !
     gpu_com_struct_ptr->command_queue = clCreateCommandQueue(gpu_com_struct_ptr->context, gpu_com_struct_ptr->device_id, 0, &(gpu_com_struct_ptr->cl_ret));
+
+    // Init the program and kernel array
+    gpu_com_struct_ptr->program_num = 0;
+    memset(gpu_com_struct_ptr->program_arr, 0, sizeof(cl_program) * MAX_PROGRAM_NUM);
+    memset(gpu_com_struct_ptr->kernel_arr, 0, sizeof(cl_kernel) * MAX_PROGRAM_NUM);
+    memset(gpu_com_struct_ptr->func_name, 0, sizeof(char*));
     
     return 0;
+}
+
+int append_gpu_program(GPU_COM_STRUCT *gpu_com_struct_ptr, char *func_name)
+{
+    // Build program
+    gpu_com_struct_ptr->program_arr[gpu_com_struct_ptr->program_num] = clCreateProgramWithSource(gpu_com_struct_ptr->context, 1, (const char**)&(gpu_com_struct_ptr->kernel_source_str), (const size_t*)&(gpu_com_struct_ptr->kernel_source_size), &(gpu_com_struct_ptr->cl_ret));
+    gpu_com_struct_ptr->cl_ret = clBuildProgram(gpu_com_struct_ptr->program_arr[gpu_com_struct_ptr->program_num], 1, &(gpu_com_struct_ptr->device_id), NULL, NULL, NULL);
+    
+    // Generate kernel
+    gpu_com_struct_ptr->kernel_arr[gpu_com_struct_ptr->program_num] = clCreateKernel(gpu_com_struct_ptr->program_arr[gpu_com_struct_ptr->program_num], func_name, &(gpu_com_struct_ptr->cl_ret));
+
+    // Copy the name
+    gpu_com_struct_ptr->func_name[gpu_com_struct_ptr->program_num] = (char*)malloc(64);
+    strncpy(gpu_com_struct_ptr->func_name[gpu_com_struct_ptr->program_num], func_name, strlen(func_name));
+
+    // Increment the program number but first to return it as an id
+    return gpu_com_struct_ptr->program_num++;
 }
 
 int init_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr, unsigned int row_num, unsigned int col_num, float *data_arr)
@@ -147,9 +170,78 @@ int init_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr, unsigned int row_num, 
     gpu_data_2d_arr_ptr->row_num = row_num;
     gpu_data_2d_arr_ptr->col_num = col_num;
 
+    // Calculate the data size and data number
+    gpu_data_2d_arr_ptr->data_num = row_num * col_num;
+    gpu_data_2d_arr_ptr->data_size = gpu_data_2d_arr_ptr->data_num * sizeof(float);
+
     // Assign new space for output_data_arr
-    gpu_data_2d_arr_ptr->output_data_arr = (float*)malloc(row_num * col_num * sizeof(float));
-    memset(gpu_data_2d_arr_ptr->output_data_arr, 0, row_num * col_num * sizeof(float));
+    gpu_data_2d_arr_ptr->output_data_arr = (float*)malloc(gpu_data_2d_arr_ptr->data_size);
+    memset(gpu_data_2d_arr_ptr->output_data_arr, 0, gpu_data_2d_arr_ptr->data_size);
+
+    return 0;
+}
+
+int gpu_slope_diminish(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
+{
+    // Set basic options to the parallel computation through array
+    int para_arr[L_PROPERTY_NUM] = {0};
+    para_arr[PL_ARR_ROW_NUM] = gpu_data_2d_arr_ptr->row_num;
+    para_arr[PL_ARR_COL_NUM] = gpu_data_2d_arr_ptr->col_num;
+    para_arr[PL_ARR_TOTAL_NUM] = gpu_data_2d_arr_ptr->data_num;
+
+    // Init a empty array for the output
+    float *tmp_output_arr = (float*)malloc(gpu_data_2d_arr_ptr->data_size);
+    if(!tmp_output_arr)
+    {
+        fprintf(stderr, "Unable to allocate space for the tmp array!\n");
+        exit(1);
+    }
+    memset(tmp_output_arr, 0, gpu_data_2d_arr_ptr->data_size);
+
+    // Create buffer for each vector on the device
+    cl_mem input_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, gpu_data_2d_arr_ptr->data_size, NULL, &(gpu_com_struct_ptr->cl_ret));
+    cl_mem para_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, L_PROPERTY_NUM * sizeof(int), NULL, &(gpu_com_struct_ptr->cl_ret));
+    cl_mem output_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_WRITE_ONLY, gpu_data_2d_arr_ptr->data_size, NULL, &(gpu_com_struct_ptr->cl_ret));
+
+    // Copy the input and parameter into the GPU memory
+    gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, input_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->input_data_arr, 0, NULL, NULL);
+    gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, para_arr_mem, CL_TRUE, 0, L_PROPERTY_NUM * sizeof(int), para_arr, 0, NULL, NULL);
+
+    // Get program id
+    int program_id = append_gpu_program(gpu_com_struct_ptr, "primitive_laplacian");
+    /*
+    // Create program
+    cl_program program = clCreateProgramWithSource(gpu_com_struct_ptr->context, 1, (const char**)&(gpu_com_struct_ptr->kernel_source_str), (const size_t*)&(gpu_com_struct_ptr->kernel_source_size), &(gpu_com_struct_ptr->cl_ret));
+    // Construct program
+    gpu_com_struct_ptr->cl_ret = clBuildProgram(program, 1, &(gpu_com_struct_ptr->device_id), NULL, NULL, NULL);
+    
+    // Create OpenCL kernel 
+    cl_kernel kernel = clCreateKernel(program, "slope_diminish", &(gpu_com_struct_ptr->cl_ret));
+    */
+
+    // Set kernel parameters
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[program_id], 0, sizeof(cl_mem), (void*)&input_arr_mem);
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[program_id], 1, sizeof(cl_mem), (void*)&para_arr_mem);
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[program_id], 2, sizeof(cl_mem), (void*)&output_arr_mem);
+
+    // Execute the kernel 
+    size_t global_item_size = gpu_data_2d_arr_ptr->data_num;
+    size_t local_item_size = 100;
+    gpu_com_struct_ptr->cl_ret = clEnqueueNDRangeKernel(gpu_com_struct_ptr->command_queue, gpu_com_struct_ptr->kernel_arr[program_id], 1, NULL, &global_item_size, &local_item_size, 0, NULL, NULL);
+
+    // Read RAM buffer
+    gpu_com_struct_ptr->cl_ret = clEnqueueReadBuffer(gpu_com_struct_ptr->command_queue, output_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, tmp_output_arr, 0, NULL, NULL);
+    
+    // Swap the array pointer
+    free(gpu_data_2d_arr_ptr->input_data_arr);
+    gpu_data_2d_arr_ptr->input_data_arr = tmp_output_arr;
+    
+    // Close and flush the CL local structures
+    gpu_com_struct_ptr->cl_ret = clFlush(gpu_com_struct_ptr->command_queue);
+    gpu_com_struct_ptr->cl_ret = clFinish(gpu_com_struct_ptr->command_queue);
+    gpu_com_struct_ptr->cl_ret = clReleaseMemObject(input_arr_mem);
+    gpu_com_struct_ptr->cl_ret = clReleaseMemObject(para_arr_mem);
+    gpu_com_struct_ptr->cl_ret = clReleaseMemObject(output_arr_mem);
 
     return 0;
 }
@@ -164,10 +256,6 @@ int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR 
     para_arr[PL_RELATIVE_ROW] = 5;
     para_arr[PL_RELATIVE_COL] = 5;
     para_arr[PL_CENTRAL_DRAG] = 1;
-    
-    // Calculate the data size and data number
-    gpu_data_2d_arr_ptr->data_num = gpu_data_2d_arr_ptr->row_num * gpu_data_2d_arr_ptr->col_num;
-    gpu_data_2d_arr_ptr->data_size = gpu_data_2d_arr_ptr->data_num * sizeof(float);
 
     // Create buffer for each vector on the device
     cl_mem input_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, gpu_data_2d_arr_ptr->data_size, NULL, &(gpu_com_struct_ptr->cl_ret));
@@ -178,37 +266,38 @@ int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR 
     gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, input_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->input_data_arr, 0, NULL, NULL);
     gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, para_arr_mem, CL_TRUE, 0, L_PROPERTY_NUM * sizeof(int), para_arr, 0, NULL, NULL);
 
+    // Create program and kernel
+    int program_id = append_gpu_program(gpu_com_struct_ptr, "primitive_laplacian");
+    /*
     // Create program
     cl_program program = clCreateProgramWithSource(gpu_com_struct_ptr->context, 1, (const char**)&(gpu_com_struct_ptr->kernel_source_str), (const size_t*)&(gpu_com_struct_ptr->kernel_source_size), &(gpu_com_struct_ptr->cl_ret));
     // Construct program
     gpu_com_struct_ptr->cl_ret = clBuildProgram(program, 1, &(gpu_com_struct_ptr->device_id), NULL, NULL, NULL);
+    printf("%d\n", gpu_com_struct_ptr->cl_ret);
     // Create OpenCL kernel
     cl_kernel kernel = clCreateKernel(program, "primitive_laplacian", &(gpu_com_struct_ptr->cl_ret));
-    
+    */
+
     // Set kernel parameters
-    gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&input_arr_mem);
-    gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void*)&para_arr_mem);
-    gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void*)&output_arr_mem);
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[program_id], 0, sizeof(cl_mem), (void*)&input_arr_mem);
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[program_id], 1, sizeof(cl_mem), (void*)&para_arr_mem);
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[program_id], 2, sizeof(cl_mem), (void*)&output_arr_mem);
 
     // Execute the kernel
     size_t global_item_size = gpu_data_2d_arr_ptr->data_num;
     size_t local_item_size = 100;
-    gpu_com_struct_ptr->cl_ret = clEnqueueNDRangeKernel(gpu_com_struct_ptr->command_queue, kernel, 1, NULL, &global_item_size, &local_item_size, 0, NULL, NULL);
+    gpu_com_struct_ptr->cl_ret = clEnqueueNDRangeKernel(gpu_com_struct_ptr->command_queue, gpu_com_struct_ptr->kernel_arr[program_id], 1, NULL, &global_item_size, &local_item_size, 0, NULL, NULL);
     
     // Read RAM buffer output_arr_mem input the local buffer output_data_arr
     gpu_com_struct_ptr->cl_ret = clEnqueueReadBuffer(gpu_com_struct_ptr->command_queue, output_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->output_data_arr, 0, NULL, NULL);
-    printf("%d\n", gpu_com_struct_ptr->cl_ret);
 
     // Close and flush the CL local structures
     gpu_com_struct_ptr->cl_ret = clFlush(gpu_com_struct_ptr->command_queue);
     gpu_com_struct_ptr->cl_ret = clFinish(gpu_com_struct_ptr->command_queue);
-    gpu_com_struct_ptr->cl_ret = clReleaseKernel(kernel);
-    gpu_com_struct_ptr->cl_ret = clReleaseProgram(program);
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(input_arr_mem);
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(output_arr_mem);
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(para_arr_mem);
     
-    printf("%u\n", gpu_data_2d_arr_ptr->data_size);
     return 0;
 }
 
@@ -223,10 +312,6 @@ int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *g
     para_arr[PL_RELATIVE_COL] = 5;
     para_arr[PL_CENTRAL_DRAG] = 1;
     para_arr[WL_DISTANCE_COEFFICIENT] = 2;
-    
-    // Calculate the data size and data number
-    gpu_data_2d_arr_ptr->data_num = gpu_data_2d_arr_ptr->row_num * gpu_data_2d_arr_ptr->col_num;
-    gpu_data_2d_arr_ptr->data_size = gpu_data_2d_arr_ptr->data_num * sizeof(float);
 
     // Create buffer for each vector on the device
     cl_mem input_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, gpu_data_2d_arr_ptr->data_size, NULL, &(gpu_com_struct_ptr->cl_ret));
@@ -243,7 +328,6 @@ int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *g
     gpu_com_struct_ptr->cl_ret = clBuildProgram(program, 1, &(gpu_com_struct_ptr->device_id), NULL, NULL, NULL);
     // Create OpenCL kernel (ERROR!)
     cl_kernel kernel = clCreateKernel(program, "weighed_laplacian", &(gpu_com_struct_ptr->cl_ret));
-    printf("%d\n", gpu_com_struct_ptr->cl_ret);
 
     // Set kernel parameters
     gpu_com_struct_ptr->cl_ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&input_arr_mem);
@@ -266,7 +350,7 @@ int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *g
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(input_arr_mem);
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(output_arr_mem);
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(para_arr_mem);
-    
+    /*
     unsigned int i, j;
     for(i = 0; i < gpu_data_2d_arr_ptr->row_num; i++)
     {
@@ -277,7 +361,7 @@ int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *g
         }
         printf("\n");
     }
-    
+    */
     return 0;
 }
 
@@ -293,10 +377,6 @@ int gpu_statistic_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR 
     para_arr[PL_CENTRAL_DRAG] = 1;
     para_arr[WL_DISTANCE_COEFFICIENT] = 2;
     para_arr[SL_THRESHOLD] = 3;
-    
-    // Calculate the data size and data number
-    gpu_data_2d_arr_ptr->data_num = gpu_data_2d_arr_ptr->row_num * gpu_data_2d_arr_ptr->col_num;
-    gpu_data_2d_arr_ptr->data_size = gpu_data_2d_arr_ptr->data_num * sizeof(float);
 
     // Create buffer for each vector on the device
     cl_mem input_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, gpu_data_2d_arr_ptr->data_size, NULL, &(gpu_com_struct_ptr->cl_ret));
@@ -343,6 +423,20 @@ int destroy_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr)
     // Destroy the global CL objects
     gpu_com_struct_ptr->cl_ret = clReleaseCommandQueue(gpu_com_struct_ptr->command_queue);
     gpu_com_struct_ptr->cl_ret = clReleaseContext(gpu_com_struct_ptr->context);
+    return 0;
+}
+
+int destroy_gpu_program_array(GPU_COM_STRUCT *gpu_com_struct_ptr)
+{
+    // Clear the array
+    unsigned int i;
+    for(i = 0; i < gpu_com_struct_ptr->program_num; i++)
+    {
+        gpu_com_struct_ptr->cl_ret = clReleaseKernel(gpu_com_struct_ptr->kernel_arr[i]);
+        gpu_com_struct_ptr->cl_ret = clReleaseProgram(gpu_com_struct_ptr->program_arr[i]);
+        free(gpu_com_struct_ptr->func_name[i]);
+        gpu_com_struct_ptr->func_name[i] = NULL;
+    }
     return 0;
 }
 
