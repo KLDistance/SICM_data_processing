@@ -160,6 +160,7 @@ int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR 
     int para_arr[L_PROPERTY_NUM] = {0};
     para_arr[PL_ARR_ROW_NUM] = gpu_data_2d_arr_ptr->row_num;
     para_arr[PL_ARR_COL_NUM] = gpu_data_2d_arr_ptr->col_num;
+    para_arr[PL_ARR_TOTAL_NUM] = gpu_data_2d_arr_ptr->data_num;
     para_arr[PL_RELATIVE_ROW] = 5;
     para_arr[PL_RELATIVE_COL] = 5;
     para_arr[PL_CENTRAL_DRAG] = 1;
@@ -217,6 +218,7 @@ int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *g
     int para_arr[L_PROPERTY_NUM] = {0};
     para_arr[PL_ARR_ROW_NUM] = gpu_data_2d_arr_ptr->row_num;
     para_arr[PL_ARR_COL_NUM] = gpu_data_2d_arr_ptr->col_num;
+    para_arr[PL_ARR_TOTAL_NUM] = gpu_data_2d_arr_ptr->data_num;
     para_arr[PL_RELATIVE_ROW] = 5;
     para_arr[PL_RELATIVE_COL] = 5;
     para_arr[PL_CENTRAL_DRAG] = 1;
@@ -227,9 +229,9 @@ int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *g
     gpu_data_2d_arr_ptr->data_size = gpu_data_2d_arr_ptr->data_num * sizeof(float);
 
     // Create buffer for each vector on the device
-    cl_mem input_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->input_data_arr, &(gpu_com_struct_ptr->cl_ret));
-    cl_mem para_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, L_PROPERTY_NUM * sizeof(int), para_arr, &(gpu_com_struct_ptr->cl_ret));
-    cl_mem output_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_WRITE_ONLY, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->output_data_arr, &(gpu_com_struct_ptr->cl_ret));
+    cl_mem input_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, gpu_data_2d_arr_ptr->data_size, NULL, &(gpu_com_struct_ptr->cl_ret));
+    cl_mem para_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, L_PROPERTY_NUM * sizeof(int), NULL, &(gpu_com_struct_ptr->cl_ret));
+    cl_mem output_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_WRITE_ONLY, gpu_data_2d_arr_ptr->data_size, NULL, &(gpu_com_struct_ptr->cl_ret));
     
     // Copy the input and parameter array into the GPU memory
     gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, input_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->input_data_arr, 0, NULL, NULL);
@@ -285,6 +287,7 @@ int gpu_statistic_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR 
     int para_arr[L_PROPERTY_NUM] = {0};
     para_arr[PL_ARR_ROW_NUM] = gpu_data_2d_arr_ptr->row_num;
     para_arr[PL_ARR_COL_NUM] = gpu_data_2d_arr_ptr->col_num;
+    para_arr[PL_ARR_TOTAL_NUM] = gpu_data_2d_arr_ptr->data_num;
     para_arr[PL_RELATIVE_ROW] = 5;
     para_arr[PL_RELATIVE_COL] = 5;
     para_arr[PL_CENTRAL_DRAG] = 1;
@@ -296,9 +299,9 @@ int gpu_statistic_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR 
     gpu_data_2d_arr_ptr->data_size = gpu_data_2d_arr_ptr->data_num * sizeof(float);
 
     // Create buffer for each vector on the device
-    cl_mem input_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->input_data_arr, &(gpu_com_struct_ptr->cl_ret));
-    cl_mem para_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, L_PROPERTY_NUM * sizeof(int), para_arr, &(gpu_com_struct_ptr->cl_ret));
-    cl_mem output_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_WRITE_ONLY, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->output_data_arr, &(gpu_com_struct_ptr->cl_ret));
+    cl_mem input_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, gpu_data_2d_arr_ptr->data_size, NULL, &(gpu_com_struct_ptr->cl_ret));
+    cl_mem para_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, L_PROPERTY_NUM * sizeof(int), NULL, &(gpu_com_struct_ptr->cl_ret));
+    cl_mem output_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_WRITE_ONLY, gpu_data_2d_arr_ptr->data_size, NULL, &(gpu_com_struct_ptr->cl_ret));
 
     // Copy the input and parameter array into the GPU memory
     gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, input_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->input_data_arr, 0, NULL, NULL);

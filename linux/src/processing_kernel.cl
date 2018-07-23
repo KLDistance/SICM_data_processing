@@ -1,3 +1,20 @@
+__kernel void slope_diminish(__global float *input_data_arr, __global int *para_arr, __global float *output_data_arr)
+{
+    unsigned int gpu_global_index = get_global_id(0);
+
+    // Present row index for the data
+    unsigned int presRow = gpu_global_index / para_arr[1];
+    // Present column index for the data
+    unsigned int presCol = gpu_global_index % para_arr[1];
+
+    // Find the 4 corners of the image and calculate the compensation slope
+    float x_zero_to_max_slope = (float)(input_data_arr[para_arr[1] - 1] - input_data_arr[0]) / (float)para_arr[1];
+    float y_zero_to_max_slope = (float)(input_data_arr[para_arr[2] + 1 - para_arr[1]] - input_data_arr[0] / (float)para[0]);
+
+    // Compensate the present point with specific value according to the x and y slope
+    output_data_arr[gpu_global_index] = input_data_arr[gpu_global_index] - x_zero_to_max_slope * presCol - y_zero_to_max_slope * presRow;
+}
+
 __kernel void primitive_laplacian(__global float *input_data_arr, __global int *para_arr, __global float *output_data_arr)
 {
     unsigned int gpu_global_index = get_global_id(0);
@@ -10,11 +27,11 @@ __kernel void primitive_laplacian(__global float *input_data_arr, __global int *
     unsigned int presCol = gpu_global_index % para_arr[1];
     
     // Define the border of the edge points
-    unsigned int left_border = (presRow < para_arr[2]) ? 0 : (presRow - para_arr[2]);
-    unsigned int right_border = (presRow >= para_arr[0] - para_arr[2]) ? para_arr[0] : (presRow + para_arr[2]);
-    unsigned int upper_border = (presCol < para_arr[3]) ? 0 : (presCol - para_arr[3]);
-    unsigned int bottom_border = (presCol >= para_arr[1] - para_arr[3]) ? para_arr[1] : (presCol + para_arr[3]);
-
+    unsigned int left_border = (presRow < para_arr[3]) ? 0 : (presRow - para_arr[3]);
+    unsigned int right_border = (presRow >= para_arr[0] - para_arr[3]) ? para_arr[0] : (presRow + para_arr[3]);
+    unsigned int upper_border = (presCol < para_arr[4]) ? 0 : (presCol - para_arr[4]);
+    unsigned int bottom_border = (presCol >= para_arr[1] - para_arr[4]) ? para_arr[1] : (presCol + para_arr[4]);
+    
     // Inner region goes primitive laplacian
     unsigned int i, j;
     unsigned int k = 0;
@@ -22,97 +39,33 @@ __kernel void primitive_laplacian(__global float *input_data_arr, __global int *
     unsigned int tmp_product = 0;
     for(i = left_border; i < right_border; i++)
     {
-        tmp_product = i * ((para_arr[3] << 1) + 1);
         for(j = upper_border; j < bottom_border; j++)
         {
-            if(i == presRow && j == presCol) continue;
+            float abs_value = (input_data_arr[tmp_product + j] - input_data_arr[gpu_global_index] > 0) ? (input_data_arr[tmp_product + j] - input_data_arr[gpu_global_index]) : (input_data_arr[gpu_global_index] - input_data_arr[tmp_product + j]);
+            if((i == presRow && j == presCol) || (abs_value / input_data_arr[gpu_global_index] < 0.01f)) continue;
             k++;
             sum_surrounding += input_data_arr[tmp_product + j];
         }
+        tmp_product += ((para_arr[4] << 1) + 1);
     }
-    output_data_arr[gpu_global_index] = (sum_surrounding / (float)k);
-    
-}
-
-__kernel void weighed_laplacian(__global float *input_data_arr, __global int *para_arr, __global float *output_data_arr)
-{
-    int gpu_global_index = get_global_id(0);
-
-    // Calculation
-
-    // Present row index for the data
-    unsigned int presRow = gpu_global_index / para_arr[1];
-    // Present column index for the data
-    unsigned int presCol = gpu_global_index % para_arr[1];
-
-    // Judge whether present point is able to execute a thorough laplacian process
-    if(presRow < para_arr[2] || presRow > para_arr[0] - para_arr[2] || presCol < para_arr[3] || presCol > para_arr[1] - para_arr[3])
+    if(k <= para_arr[3] * para_arr[4] / 2)
     {
-        // On the edge region, go without any handle
         output_data_arr[gpu_global_index] = input_data_arr[gpu_global_index];
     }
     else
     {
-        // Inner region goes primitive laplacian
-        unsigned int i, j;
-        unsigned int k = 0;
-        float delta_surrounding = 0;
-        float destance_denominator = 0;
-        unsigned int tmp_product = 0;
-        for(i = presRow - para_arr[2]; i < presRow + para_arr[2]; i++)
-        {
-            tmp_product = i * ((para_arr[3] << 1) + 1);
-            for(j = presCol - para_arr[3]; j < presCol + para_arr[3]; j++)
-            {
-                if(i == presRow && j == presCol) continue;
-                k++;
-                destance_denominator = (i - presRow) * (i - presRow) + (j - presCol) * (j - presCol);
-                delta_surrounding += ((input_data_arr[tmp_product + j] - input_data_arr[gpu_global_index]) / destance_denominator);
-            }
-        }
-        output_data_arr[gpu_global_index] -= (delta_surrounding / (float)k / (float)para_arr[4]);
+        output_data_arr[gpu_global_index] = (sum_surrounding / (float)k);
     }
+}
+
+// Unfinished!
+__kernel void weighed_laplacian(__global float *input_data_arr, __global int *para_arr, __global float *output_data_arr)
+{
+    
 }
 
 // Unfinished!
 __kernel void statistic_laplacian(__global float *input_data_arr, __global int *para_arr, __global float *output_data_arr)
 {
-    int gpu_global_index = get_global_id(0);
-
-    // Calculation
-
-    // Present row index for the data
-    unsigned int presRow = gpu_global_index / para_arr[1];
-    // Present column index for the data
-    unsigned int presCol = gpu_global_index % para_arr[1];
-    // Statistical indicator for the exceptional points
-    unsigned int exc_pts = 0;
-
-    // Judge whether present point is able to execute a thorough laplacian process
-    if(presRow < para_arr[2] || presRow > para_arr[0] - para_arr[2] || presCol < para_arr[3] || presCol > para_arr[1] - para_arr[3])
-    {
-        // On the edge region, go without any handle
-        output_data_arr[gpu_global_index] = input_data_arr[gpu_global_index];
-    }
-    else
-    {
-        // Inner region goes primitive laplacian
-        unsigned int i, j;
-        unsigned int k = 0;
-        float delta_surrounding = 0;
-        float destance_denominator = 0;
-        unsigned int tmp_product = 0;
-        for(i = presRow - para_arr[2]; i < presRow + para_arr[2]; i++)
-        {
-            tmp_product = i * ((para_arr[3] << 1) + 1);
-            for(j = presCol - para_arr[3]; j < presCol + para_arr[3]; j++)
-            {
-                if(i == presRow && j == presCol) continue;
-                k++;
-                destance_denominator = (i - presRow) * (i - presRow) + (j - presCol) * (j - presCol);
-                delta_surrounding += ((input_data_arr[tmp_product + j] - input_data_arr[gpu_global_index]) / destance_denominator);
-            }
-        }
-        output_data_arr[gpu_global_index] -= (delta_surrounding / (float)k / (float)para_arr[4]);
-    }
+    
 }
