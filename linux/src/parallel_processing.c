@@ -209,15 +209,6 @@ int gpu_slope_diminish(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_
 
     // Get program id
     int program_id = append_gpu_program(gpu_com_struct_ptr, "slope_diminish");
-    /*
-    // Create program
-    cl_program program = clCreateProgramWithSource(gpu_com_struct_ptr->context, 1, (const char**)&(gpu_com_struct_ptr->kernel_source_str), (const size_t*)&(gpu_com_struct_ptr->kernel_source_size), &(gpu_com_struct_ptr->cl_ret));
-    // Construct program
-    gpu_com_struct_ptr->cl_ret = clBuildProgram(program, 1, &(gpu_com_struct_ptr->device_id), NULL, NULL, NULL);
-    
-    // Create OpenCL kernel 
-    cl_kernel kernel = clCreateKernel(program, "slope_diminish", &(gpu_com_struct_ptr->cl_ret));
-    */
 
     // Set kernel parameters
     gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[program_id], 0, sizeof(cl_mem), (void*)&input_arr_mem);
@@ -246,6 +237,128 @@ int gpu_slope_diminish(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_
     return 0;
 }
 
+int gpu_1d_curve_bending(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
+{
+    // Set basic options through array
+    int para_arr[L_PROPERTY_NUM] = {0};
+    para_arr[PL_ARR_ROW_NUM] = gpu_data_2d_arr_ptr->row_num;
+    para_arr[PL_ARR_COL_NUM] = gpu_data_2d_arr_ptr->col_num;
+    para_arr[PL_ARR_TOTAL_NUM] = gpu_data_2d_arr_ptr->data_num;
+
+    float abc_para_input[3] = {0};
+    float abc_para_output[3] = {0};
+    abc_para_input[0] = 1.0f;                     // Parameter of initial a in fx
+    abc_para_input[1] = 1.0f;                     // Parameter of initial b in fx
+    abc_para_input[2] = 1.0f;                     // Parameter of initial c in fx
+    abc_para_output[0] = 0;                    // Tempt container of feedback a, b, c
+    abc_para_output[1] = 0;
+    abc_para_output[2] = 0;
+
+    // Parameters
+    unsigned int i;
+    unsigned int max_iteration = 1000;      // Max iteration number for regression model
+
+    // Allocate the space for x vector input and copy in the data
+    float *x_vector = (float*)malloc(gpu_data_2d_arr_ptr->col_num * sizeof(float));
+    if(!x_vector)
+    {
+        fprintf(stderr, "Unable to allocate space for x input vector!\n");
+        exit(1);
+    }
+    for(i = 0; i < gpu_data_2d_arr_ptr->col_num; i++)
+    {
+        x_vector[i] = gpu_data_2d_arr_ptr->input_data_arr[i];
+    }
+
+    // Append the regression cl kernel into the array
+    int regression_id = append_gpu_program(gpu_com_struct_ptr, "one_dimension_regression");
+
+    // Create the constant GPU block memory
+    cl_mem x_vector_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, gpu_data_2d_arr_ptr->col_num * sizeof(float), NULL, &(gpu_com_struct_ptr->cl_ret));
+    cl_mem abc_para_input_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, 3 * sizeof(float), NULL, &(gpu_com_struct_ptr->cl_ret));
+    cl_mem abc_para_output_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_WRITE_ONLY, 3 * sizeof(float), NULL, &(gpu_com_struct_ptr->cl_ret));
+    cl_mem para_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, L_PROPERTY_NUM * sizeof(int), NULL, &(gpu_com_struct_ptr->cl_ret));
+
+    // Write the constant memory into the GPU buffer (Under test!)
+    gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, x_vector_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->col_num * sizeof(float), x_vector, 0, NULL, NULL);
+    gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, para_arr_mem, CL_TRUE,0,  L_PROPERTY_NUM * sizeof(int), para_arr, 0, NULL, NULL);
+
+    // First to iterate the quadratic regression for the 1d curve model
+    for(i = 0; i < max_iteration; i++)
+    {
+        gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, abc_para_input_mem, CL_TRUE, 0, 3 * sizeof(float), abc_para_input, 0, NULL, NULL);
+
+        // Set kernel arg (Do not clear whether exception exists)
+        gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[regression_id], 0, sizeof(cl_mem), (void*)&x_vector_mem);
+        gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[regression_id], 1, sizeof(cl_mem), (void*)&abc_para_input_mem);
+        gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[regression_id], 2, sizeof(cl_mem), (void*)&abc_para_output_mem);
+        gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[regression_id], 3, sizeof(cl_mem), (void*)&para_arr_mem);
+
+        size_t global_item_size = gpu_data_2d_arr_ptr->col_num;
+        size_t local_item_size = 1;
+        gpu_com_struct_ptr->cl_ret = clEnqueueNDRangeKernel(gpu_com_struct_ptr->command_queue, gpu_com_struct_ptr->kernel_arr[regression_id], 1, NULL, &global_item_size, &local_item_size, 0, NULL, NULL);
+
+        // Read the data out
+        gpu_com_struct_ptr->cl_ret = clEnqueueReadBuffer(gpu_com_struct_ptr->command_queue, abc_para_output_mem, CL_TRUE, 0, 3 * sizeof(float), abc_para_output, 0, NULL, NULL);
+
+        // Copy the value to the input array as the next parameter
+        abc_para_input[0] = abc_para_output[0];
+        abc_para_input[1] = abc_para_output[1];
+        abc_para_input[2] = abc_para_output[2];
+    }
+
+    // Then process the data in the 2d array
+    // Allocate for the tmp memory for the output
+    float *tmp_output_arr = (float*)malloc(gpu_data_2d_arr_ptr->data_size);
+    if(!tmp_output_arr)
+    {
+        fprintf(stderr, "Unable to allocate space for tmp output data array!\n");
+        exit(1);
+    }
+
+    // Append bending function kernel
+    int bending_id = append_gpu_program(gpu_com_struct_ptr, "surface_bending");
+
+    // Create GPU memory for bending process
+    cl_mem input_2d_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, gpu_data_2d_arr_ptr->data_size, NULL, &(gpu_com_struct_ptr->cl_ret));
+    cl_mem output_2d_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_WRITE_ONLY, gpu_data_2d_arr_ptr->data_size, NULL, &(gpu_com_struct_ptr->cl_ret));
+
+    // Write data into GPU memory
+    gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, input_2d_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, gpu_data_2d_arr_ptr->input_data_arr, 0, NULL, NULL);
+
+    // Set kernel arg
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[bending_id], 0, sizeof(cl_mem), (void*)&input_2d_arr_mem);
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[bending_id], 1, sizeof(cl_mem), (void*)&para_arr_mem);
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[bending_id], 2, sizeof(cl_mem), (void*)&abc_para_input_mem);
+    gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[bending_id], 3, sizeof(cl_mem), (void*)&output_2d_arr_mem);
+
+    size_t global_item_size_for_2d_arr = gpu_data_2d_arr_ptr->data_num;
+    size_t local_item_size_for_2d_arr = 100;
+    gpu_com_struct_ptr->cl_ret = clEnqueueNDRangeKernel(gpu_com_struct_ptr->command_queue, gpu_com_struct_ptr->kernel_arr[bending_id], 1, NULL, &global_item_size_for_2d_arr, &local_item_size_for_2d_arr, 0, NULL, NULL);
+
+    // Read the data out
+    gpu_com_struct_ptr->cl_ret = clEnqueueReadBuffer(gpu_com_struct_ptr->command_queue, output_2d_arr_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->data_size, tmp_output_arr, 0, NULL, NULL);
+
+    // Swap the array pointer
+    free(gpu_data_2d_arr_ptr->input_data_arr);
+    gpu_data_2d_arr_ptr->input_data_arr = tmp_output_arr;
+
+    // Free memory
+    free(x_vector);
+
+    // Close and flush the local cl structures
+    gpu_com_struct_ptr->cl_ret = clFlush(gpu_com_struct_ptr->command_queue);
+    gpu_com_struct_ptr->cl_ret = clFinish(gpu_com_struct_ptr->command_queue);
+    gpu_com_struct_ptr->cl_ret = clReleaseMemObject(x_vector_mem);
+    gpu_com_struct_ptr->cl_ret = clReleaseMemObject(abc_para_input_mem);
+    gpu_com_struct_ptr->cl_ret = clReleaseMemObject(abc_para_output_mem);
+    gpu_com_struct_ptr->cl_ret = clReleaseMemObject(para_arr_mem);
+    gpu_com_struct_ptr->cl_ret = clReleaseMemObject(input_2d_arr_mem);
+    gpu_com_struct_ptr->cl_ret = clReleaseMemObject(output_2d_arr_mem);
+    
+    return 0;
+}
+
 int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
 {
     // Set basic options to the parallel computation through array
@@ -268,15 +381,6 @@ int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR 
 
     // Create program and kernel
     int program_id = append_gpu_program(gpu_com_struct_ptr, "primitive_laplacian");
-    /*
-    // Create program
-    cl_program program = clCreateProgramWithSource(gpu_com_struct_ptr->context, 1, (const char**)&(gpu_com_struct_ptr->kernel_source_str), (const size_t*)&(gpu_com_struct_ptr->kernel_source_size), &(gpu_com_struct_ptr->cl_ret));
-    // Construct program
-    gpu_com_struct_ptr->cl_ret = clBuildProgram(program, 1, &(gpu_com_struct_ptr->device_id), NULL, NULL, NULL);
-    printf("%d\n", gpu_com_struct_ptr->cl_ret);
-    // Create OpenCL kernel
-    cl_kernel kernel = clCreateKernel(program, "primitive_laplacian", &(gpu_com_struct_ptr->cl_ret));
-    */
 
     // Set kernel parameters
     gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[program_id], 0, sizeof(cl_mem), (void*)&input_arr_mem);
@@ -350,18 +454,7 @@ int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *g
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(input_arr_mem);
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(output_arr_mem);
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(para_arr_mem);
-    /*
-    unsigned int i, j;
-    for(i = 0; i < gpu_data_2d_arr_ptr->row_num; i++)
-    {
-        unsigned int tmp_product = i * gpu_data_2d_arr_ptr->col_num;
-        for(j = 0; j < gpu_data_2d_arr_ptr->col_num; j++)
-        {
-            printf("\t%f", gpu_data_2d_arr_ptr->input_data_arr[tmp_product + j]);
-        }
-        printf("\n");
-    }
-    */
+    
     return 0;
 }
 
