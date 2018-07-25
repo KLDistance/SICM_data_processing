@@ -1,11 +1,22 @@
-__kernel void one_dimension_regression(__global float *x_vector, __global float *input_abc_para, __global float *output_abc_para, __global int *para_arr)
+__kernel void one_dimension_regression(__global float *x_vector, __global float *input_abc_para, __global int *para_arr, __global float *output_vector_a, __global float *output_vector_b, __global float *output_vector_c)
 {
-
+    unsigned int index = get_global_id(0);
+    float x_square = index * index;
+    float single_deviation = input_abc_para[0] * x_square + input_abc_para[1] * index + input_abc_para[2] - x_vector[index];
+    float square_deviation = single_deviation * single_deviation * 1E-4 / para_arr[1];
+    output_vector_a[index] = square_deviation * x_square;
+    output_vector_b[index] = square_deviation * index;
+    output_vector_c[index] = square_deviation;
 }
 
-__kernel void surface_bending(__global float *input_data_arr, __global int *para_arr, __global float *abc_input_arr, __global float *output_data_arr)
+__kernel void surface_bending(__global float *input_data_arr, __global int *para_arr, __global float *input_abc_para, __global float *output_data_arr)
 {
-
+    unsigned int index = get_global_id(0);
+    unsigned int pres_col = index % para_arr[1];
+    unsigned int pres_row = index % para_arr[1];
+    float x_square = pres_col * pres_col;
+    float polynomial_value = input_abc_para[0] * x_square + input_abc_para[1] * pres_col + input_abc_para[2];
+    output_data_arr[index] = input_data_arr[index] - polynomial_value + 10000;
 }
 
 __kernel void slope_diminish(__global float *input_data_arr, __global int *para_arr, __global float *output_data_arr)

@@ -17,7 +17,7 @@ int smooth_function(char *file_path, char *proc_type)
     init_gpu_state(&gpu_com_struct);
 
     // Slope diminish
-    gpu_slope_diminish(&gpu_com_struct, &gpu_data_2d_arr);
+    gpu_1d_curve_bending(&gpu_com_struct, &gpu_data_2d_arr);
     
     // Calculation
     gpu_primitive_laplacian(&gpu_com_struct, &gpu_data_2d_arr);

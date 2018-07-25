@@ -8,6 +8,7 @@
 #include <CL/cl.h>
 #include <CL/cl_gl.h>
 #include <time.h>
+#include <math.h>
 
 // Define the property array entry pass into the GPU
 #define L_PROPERTY_NUM 8
