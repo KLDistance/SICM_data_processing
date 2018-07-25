@@ -33,6 +33,9 @@
 // Define max number of programs in the kernel
 #define MAX_PROGRAM_NUM 256
 
+// Define the number of pass in number in machine learning property
+#define ML_PROPERTY_NUM 3
+
 
 typedef struct
 {
@@ -59,12 +62,23 @@ typedef struct
     float *output_data_arr;
 } GPU_DATA_2D_ARR;
 
+typedef struct
+{
+    float a_learning_rate;
+    float b_learning_rate;
+    float c_learning_rate;
+    float init_a;
+    float init_b;
+    float init_c;
+    unsigned int iteration_num;
+} CURVE_PROPERTY;
+
 extern int check_gpu_info();
 extern int init_gpu_state(GPU_COM_STRUCT *gpu_com_struct_ptr);
 extern int init_gpu_2d_arr(GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr, unsigned int row_num, unsigned int col_num, float *data_arr);
 extern int append_gpu_program(GPU_COM_STRUCT *gpu_com_struct_ptr, char *func_name);
 extern int gpu_slope_diminish(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr);
-extern int gpu_1d_curve_bending(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr);
+extern int gpu_1d_curve_bending(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr, CURVE_PROPERTY *curve_property_ptr);
 extern int gpu_primitive_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr);
 extern int gpu_weighed_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr);
 extern int gpu_statistic_laplacian(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr);

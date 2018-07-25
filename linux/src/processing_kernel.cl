@@ -1,12 +1,12 @@
-__kernel void one_dimension_regression(__global float *x_vector, __global float *input_abc_para, __global int *para_arr, __global float *output_vector_a, __global float *output_vector_b, __global float *output_vector_c)
+__kernel void one_dimension_regression(__global float *x_vector, __global float *input_abc_para, __global int *para_arr, __global float *learning_rate_para, __global float *output_vector_a, __global float *output_vector_b, __global float *output_vector_c)
 {
     unsigned int index = get_global_id(0);
     float x_square = index * index;
     float single_deviation = input_abc_para[0] * x_square + input_abc_para[1] * index + input_abc_para[2] - x_vector[index];
-    float square_deviation = single_deviation * single_deviation * 1E-4 / para_arr[1];
-    output_vector_a[index] = square_deviation * x_square;
-    output_vector_b[index] = square_deviation * index;
-    output_vector_c[index] = square_deviation;
+    float proc_deviation = single_deviation / para_arr[1];
+    output_vector_a[index] = proc_deviation * x_square * learning_rate_para[0];
+    output_vector_b[index] = proc_deviation * index * learning_rate_para[1];
+    output_vector_c[index] = proc_deviation * learning_rate_para[2];
 }
 
 __kernel void surface_bending(__global float *input_data_arr, __global int *para_arr, __global float *input_abc_para, __global float *output_data_arr)
@@ -16,7 +16,7 @@ __kernel void surface_bending(__global float *input_data_arr, __global int *para
     unsigned int pres_row = index % para_arr[1];
     float x_square = pres_col * pres_col;
     float polynomial_value = input_abc_para[0] * x_square + input_abc_para[1] * pres_col + input_abc_para[2];
-    output_data_arr[index] = input_data_arr[index] - polynomial_value + 10000;
+    output_data_arr[index] = input_data_arr[index] - polynomial_value + para_arr[5];
 }
 
 __kernel void slope_diminish(__global float *input_data_arr, __global int *para_arr, __global float *output_data_arr)
@@ -58,7 +58,7 @@ __kernel void primitive_laplacian(__global float *input_data_arr, __global int *
         for(j = upper_border; j < bottom_border; j++)
         {
             float abs_value = (input_data_arr[tmp_product + j] - input_data_arr[gpu_global_index] > 0) ? (input_data_arr[tmp_product + j] - input_data_arr[gpu_global_index]) : (input_data_arr[gpu_global_index] - input_data_arr[tmp_product + j]);
-            if((i == presRow && j == presCol) || (abs_value / input_data_arr[gpu_global_index] < 0.02f)) continue;
+            if((i == presRow && j == presCol) || (abs_value / input_data_arr[gpu_global_index] < 0.012f)) continue;
             k++;
             sum_surrounding += input_data_arr[tmp_product + j];
         }
@@ -73,7 +73,7 @@ __kernel void primitive_laplacian(__global float *input_data_arr, __global int *
         output_data_arr[gpu_global_index] = (sum_surrounding / (float)k);
     }
     
-    output_data_arr[gpu_global_index] = input_data_arr[gpu_global_index];
+    //output_data_arr[gpu_global_index] = input_data_arr[gpu_global_index];
 }
 
 // Unfinished!

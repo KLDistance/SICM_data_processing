@@ -248,22 +248,29 @@ int gpu_slope_diminish(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_
     return 0;
 }
 
-int gpu_1d_curve_bending(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr)
+int gpu_1d_curve_bending(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gpu_data_2d_arr_ptr, CURVE_PROPERTY *curve_property_ptr)
 {
     // Set basic options through array
     int para_arr[L_PROPERTY_NUM] = {0};
     para_arr[PL_ARR_ROW_NUM] = gpu_data_2d_arr_ptr->row_num;
     para_arr[PL_ARR_COL_NUM] = gpu_data_2d_arr_ptr->col_num;
     para_arr[PL_ARR_TOTAL_NUM] = gpu_data_2d_arr_ptr->data_num;
+    para_arr[PL_CENTRAL_DRAG] = 10000;      // Here central drag is abort, using elevating property of the whole image instead
+
+    // Set learning rate for the a b c
+    float ml_property[ML_PROPERTY_NUM] = {0.0f, 0.0f, 0.0f};
+    ml_property[0] = curve_property_ptr->a_learning_rate;      // Learning rate for a 
+    ml_property[1] = curve_property_ptr->b_learning_rate;      // Learning rate for b
+    ml_property[2] = curve_property_ptr->c_learning_rate;      // Learning rate for c
 
     float abc_para_input[3] = {0};
-    abc_para_input[0] = 1.0f;                     // Parameter of initial a in fx
-    abc_para_input[1] = 1.0f;                     // Parameter of initial b in fx
-    abc_para_input[2] = 1.0f;                     // Parameter of initial c in fx
+    abc_para_input[0] = curve_property_ptr->init_a;                     // Parameter of initial a in fx
+    abc_para_input[1] = curve_property_ptr->init_b;                     // Parameter of initial b in fx
+    abc_para_input[2] = curve_property_ptr->init_c;                       // Parameter of initial c in fx
 
     // Parameters
     unsigned int i, j, k;
-    unsigned int max_iteration = 1000;      // Max iteration number for regression model
+    unsigned int max_iteration = curve_property_ptr->iteration_num;      // Max iteration number for regression model
 
     // Allocate the space for x vector input and copy in the data
     float *x_vector = (float*)malloc(gpu_data_2d_arr_ptr->col_num * sizeof(float));
@@ -296,6 +303,7 @@ int gpu_1d_curve_bending(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gp
     cl_mem x_vector_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, gpu_data_2d_arr_ptr->col_num * sizeof(float), NULL, &(gpu_com_struct_ptr->cl_ret));
     cl_mem abc_para_input_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, 3 * sizeof(float), NULL, &(gpu_com_struct_ptr->cl_ret));
     cl_mem para_arr_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, L_PROPERTY_NUM * sizeof(int), NULL, &(gpu_com_struct_ptr->cl_ret));
+    cl_mem learning_rate_mem = clCreateBuffer(gpu_com_struct_ptr->context, CL_MEM_READ_ONLY, ML_PROPERTY_NUM * sizeof(float), NULL, &(gpu_com_struct_ptr->cl_ret));
     cl_mem tmp_vector_output_mem[3];
     for(i = 0; i < 3; i++)
     {
@@ -304,17 +312,20 @@ int gpu_1d_curve_bending(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gp
 
     // Write the constant memory into the GPU buffer (Under test!)
     gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, x_vector_mem, CL_TRUE, 0, gpu_data_2d_arr_ptr->col_num * sizeof(float), x_vector, 0, NULL, NULL);
-    gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, para_arr_mem, CL_TRUE,0,  L_PROPERTY_NUM * sizeof(int), para_arr, 0, NULL, NULL);
+    gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, para_arr_mem, CL_TRUE, 0, L_PROPERTY_NUM * sizeof(int), para_arr, 0, NULL, NULL);
+    gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, learning_rate_mem, CL_TRUE, 0, ML_PROPERTY_NUM * sizeof(float), ml_property, 0, NULL, NULL);
 
     // First to iterate the quadratic regression for the 1d curve model
     // Set the error permitted
-    float err_tolerant = 1E-5;
+    float err_tolerant = 2E-5;
     for(i = 0; i < max_iteration; i++)
     {
+        // printf("iter: %u, a: %f, b: %f, c: %f %f\n", i, abc_para_input[0], abc_para_input[1], abc_para_input[2], x_vector[0]);
         // Store the tmp a, b, c
-        float tmp_a = abc_para_input[0];
-        float tmp_b = abc_para_input[1];
-        float tmp_c = abc_para_input[2];
+        float tmp_abc[3] = {0, 0, 0};
+        tmp_abc[0] = abc_para_input[0];
+        tmp_abc[1] = abc_para_input[1];
+        tmp_abc[2] = abc_para_input[2];
 
         gpu_com_struct_ptr->cl_ret = clEnqueueWriteBuffer(gpu_com_struct_ptr->command_queue, abc_para_input_mem, CL_TRUE, 0, 3 * sizeof(float), abc_para_input, 0, NULL, NULL);
 
@@ -322,10 +333,10 @@ int gpu_1d_curve_bending(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gp
         gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[regression_id], 0, sizeof(cl_mem), (void*)&x_vector_mem);
         gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[regression_id], 1, sizeof(cl_mem), (void*)&abc_para_input_mem);
         gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[regression_id], 2, sizeof(cl_mem), (void*)&para_arr_mem);
+        gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[regression_id], 3, sizeof(cl_mem), (void*)&learning_rate_mem);
         for(j = 0; j < 3; j++)
         {
-            printf("Goes here!\n");
-            gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[regression_id], j + 3, sizeof(cl_mem), (void*)&(tmp_vector_output_mem[j + 3]));
+            gpu_com_struct_ptr->cl_ret = clSetKernelArg(gpu_com_struct_ptr->kernel_arr[regression_id], j + 4, sizeof(cl_mem), (void*)&(tmp_vector_output_mem[j]));
         }
 
         size_t global_item_size = gpu_data_2d_arr_ptr->col_num;
@@ -339,21 +350,33 @@ int gpu_1d_curve_bending(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gp
         }
         
         // Change the value of a, b, c
-        float tmp_sum = 0;
+        float tmp_sum;
         for(j = 0; j < 3; j++)
         {
+            tmp_sum = 0;
             for(k = 0; k < gpu_data_2d_arr_ptr->col_num; k++)
             {
                 tmp_sum += tmp_vector_output[j][k];
             }
-            abc_para_input[j] -= tmp_sum;
+            tmp_abc[j] -= tmp_sum;
         }
+
         // Absolute value of a, b, c change under threshold will stop the iteration
-        int a_slope_exceed = f_abs(tmp_a - abc_para_input[0]) / tmp_a < err_tolerant;
-        int b_slope_exceed = f_abs(tmp_b - abc_para_input[1]) / tmp_b < err_tolerant;
-        int c_slope_exceed = f_abs(tmp_c - abc_para_input[2]) / tmp_c < err_tolerant;
+        int a_slope_exceed = f_abs((tmp_abc[0] - abc_para_input[0]) / tmp_abc[0]) < err_tolerant;
+        int b_slope_exceed = f_abs((tmp_abc[1] - abc_para_input[1]) / tmp_abc[1]) < err_tolerant;
+        int c_slope_exceed = f_abs((tmp_abc[2] - abc_para_input[2]) / tmp_abc[2]) < err_tolerant;
+        // printf("%d %d %d\n", a_slope_exceed, b_slope_exceed, c_slope_exceed);
+
+        // Swap value with the original parameters
+        abc_para_input[0] = tmp_abc[0];
+        abc_para_input[1] = tmp_abc[1];
+        abc_para_input[2] = tmp_abc[2];
+
+        // Judge whether break the loop
         if(a_slope_exceed && b_slope_exceed && c_slope_exceed) break;
     }
+
+    printf("Last iter: %u, a: %f, b: %f, c: %f %f\n", i, abc_para_input[0], abc_para_input[1], abc_para_input[2], x_vector[0]);
 
     // Then process the data in the 2d array
     // Allocate for the tmp memory for the output
@@ -404,6 +427,7 @@ int gpu_1d_curve_bending(GPU_COM_STRUCT *gpu_com_struct_ptr, GPU_DATA_2D_ARR *gp
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(x_vector_mem);
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(abc_para_input_mem);
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(para_arr_mem);
+    gpu_com_struct_ptr->cl_ret = clReleaseMemObject(learning_rate_mem);
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(input_2d_arr_mem);
     gpu_com_struct_ptr->cl_ret = clReleaseMemObject(output_2d_arr_mem);
     for(i = 0; i < 3; i++)
