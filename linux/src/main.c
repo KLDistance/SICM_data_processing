@@ -23,13 +23,13 @@ int smooth_function(char *file_path, char *proc_type)
 
         if(input_key == 'd')
         {
-            curve_property.a_learning_rate = 1E-7;
-            curve_property.b_learning_rate = 8E-6;
-            curve_property.c_learning_rate = 3E-6;
-            curve_property.init_a = -1.25f;
-            curve_property.init_b = 100.0f;
-            curve_property.init_c = 1.0f;
-            curve_property.iteration_num = 10000;
+            curve_property.a_learning_rate = 1E-5;
+            curve_property.b_learning_rate = 1E-5;
+            curve_property.c_learning_rate = 1E-5;
+            curve_property.init_a = -2.0f;
+            curve_property.init_b = 10.0f;
+            curve_property.init_c = 100.0f;
+            curve_property.iteration_num = 20000;
 
             break;
         }
@@ -69,7 +69,7 @@ int smooth_function(char *file_path, char *proc_type)
             fflush(stdin);
             scanf("%c", &input_key);
         }
-    }while(1);
+    } while(1);
     printf("Data smoothing process starts...\n");
 
     // Initiate 2d array for GPU calculation
@@ -83,10 +83,10 @@ int smooth_function(char *file_path, char *proc_type)
     gpu_1d_curve_bending(&gpu_com_struct, &gpu_data_2d_arr, &curve_property);
     
     // Calculation
-    gpu_primitive_laplacian(&gpu_com_struct, &gpu_data_2d_arr);
+    //gpu_primitive_laplacian(&gpu_com_struct, &gpu_data_2d_arr);
 
     // Write data array into a new csv file
-    csv_struct.result_data_arr = gpu_data_2d_arr.output_data_arr;
+    csv_struct.result_data_arr = gpu_data_2d_arr.input_data_arr;
     csv_writer(&csv_struct);
 
     destroy_gpu_2d_arr(&gpu_data_2d_arr);

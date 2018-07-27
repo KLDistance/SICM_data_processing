@@ -1,3 +1,10 @@
+__kernel void base_locate(__global float *input_arr, __global int *para_arr, __global float *x_vector)
+{
+    unsigned int index = get_global_id(0);
+    unsigned int pres_col = index % para_arr[1];
+    x_vector[pres_col] = (x_vector[pres_col] + input_arr[index]) / 2;
+}
+
 __kernel void one_dimension_regression(__global float *x_vector, __global float *input_abc_para, __global int *para_arr, __global float *learning_rate_para, __global float *output_vector_a, __global float *output_vector_b, __global float *output_vector_c)
 {
     unsigned int index = get_global_id(0);
